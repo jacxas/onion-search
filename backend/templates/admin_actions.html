@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Acciones - Admin Dashboard</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Inter', sans-serif;
+      background: linear-gradient(135deg, #0f0f1a 0%, #1a1a2e 100%);
+      color: #e8e8ed;
+      min-height: 100vh;
+      padding: 2rem;
+    }
+    .container { max-width: 1000px; margin: 0 auto; }
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 2rem;
+    }
+    h1 { font-size: 2rem; font-weight: 700; color: #fff; }
+    .nav-links a { color: #8888a0; text-decoration: none; margin-left: 1.5rem; }
+    .nav-links a:hover { color: #00d9ff; }
+    
+    .actions-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 1.5rem;
+      margin-bottom: 2rem;
+    }
+    
+    .action-card {
+      background: rgba(255,255,255,0.03);
+      padding: 1.5rem;
+      border-radius: 12px;
+      border: 1px solid rgba(255,255,255,0.08);
+    }
+    
+    .action-card h3 {
+      font-size: 1.1rem;
+      margin-bottom: 0.75rem;
+      color: #fff;
+    }
+    
+    .action-card p {
+      color: #8888a0;
+      font-size: 0.9rem;
+      margin-bottom: 1rem;
+      line-height: 1.5;
+    }
+    
+    .action-card form {
+      display: inline;
+    }
+    
+    button {
+      padding: 0.75rem 1.25rem;
+      background: linear-gradient(90deg, #00d9ff, #0099cc);
+      color: #0f0f1a;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      font-weight: 600;
+      font-size: 0.9rem;
+    }
+    
+    button.danger {
+      background: linear-gradient(90deg, #f87171, #dc2626);
+      color: #fff;
+    }
+    
+    .message {
+      background: rgba(74,222,128,0.15);
+      color: #4ade80;
+      padding: 1rem;
+      border-radius: 8px;
+      margin-bottom: 1.5rem;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>⚡ Acciones</h1>
+      <nav class="nav-links">
+        <a href="/admin">Dashboard</a>
+        <a href="/admin/sites">Sitios</a>
+        <a href="/admin/blocklist">Blocklist</a>
+        <a href="/admin/actions" class="active">Acciones</a>
+      </nav>
+    </header>
+    
+    {% if request.query_params.get('msg') %}
+    <div class="message">{{ request.query_params.get('msg') }}</div>
+    {% endif %}
+    
+    <div class="actions-grid">
+      <div class="action-card">
+        <h3>🕷️ Forzar Crawl</h3>
+        <p>Inicia un nuevo crawl desde la seed list. Ãštil para actualizar el Ã­ndice manualmente.</p>
+        <form action="/admin/actions/force-crawl" method="post">
+          <button type="submit">Iniciar Crawl</button>
+        </form>
+      </div>
+      
+      <div class="action-card">
+        <h3>💓 Forzar Health Check</h3>
+        <p>Verifica el estado de todos los sitios indexados inmediatamente.</p>
+        <form action="/admin/actions/force-health-check" method="post">
+          <button type="submit">Verificar Sitios</button>
+        </form>
+      </div>
+      
+      <div class="action-card">
+        <h3>�¹ Limpiar Ãndice</h3>
+        <p>Elimina todos los documentos de Meilisearch. AcciÃ³n irreversible.</p>
+        <form action="/admin/actions/clear-index" method="post" onsubmit="return confirm('Â¿Seguro que querÃ©s borrar todo el Ã­ndice?')">
+          <button type="submit" class="danger">Limpiar Ãndice</button>
+        </form>
+      </div>
+      
+      <div class="action-card">
+        <h3>📊 Exportar Datos</h3>
+        <p>Descarga un CSV con todos los sitios indexados y sus mÃ©tricas.</p>
+        <a href="/api/admin/export" target="_blank">
+          <button type="button">Exportar CSV</button>
+        </a>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

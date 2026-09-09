@@ -1,0 +1,6 @@
+# Seed list de sitios .onion para el crawler inicial
+# Agregar una URL por lÃ¬nea (solo dominios .onion)
+
+# Ejemplos (REEMPLAZAR con sitios reales):
+# http://example1234567890abcdefghijklmnop.onion
+# http://another9876543210zyxwvutsrqponm.onion

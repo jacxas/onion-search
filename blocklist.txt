@@ -1,0 +1,5 @@
+# Blocklist de sitios .onion
+# Agregar URLs bloqueadas una por lÃ¬nea
+
+# Ejemplo:
+# http://scam1234567890abcdefghijklmnop.onion
