@@ -1,0 +1,13 @@
+# Tor configuration for onion search engine
+SocksPort 9050
+ControlPort 9051
+
+# Hidden service para la interfaz web
+HiddenServiceDir /var/lib/tor/hidden_service/
+HiddenServicePort 80 127.0.0.1:80
+
+# Logs (opcional, para debugging)
+Log notice stdout
+
+# Seguridad
+SafeLogging 1
