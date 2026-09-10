@@ -1,0 +1,36 @@
+# Frontend - Next.js Dashboard
+
+Este directorio contendrá¡¡ el frontend moderno con Next.js, React, Tailwind CSS y TypeScript.
+
+## Estructura prevista
+
+```
+frontend/
+â¼¼â¼¤ app/                 # Next.js App Router
+â¼º  ââ¼¤ page.tsx          # PÃ¡gina principal de bÃºsqueda
+â¼º  ââ¼¤ layout.tsx        # Layout base
+â¼º  ââ¼¤ admin/            # Dashboard administrativo
+â¼º  ââ¼¤ api/              # API routes
+â¼¼â¼¤ components/          # Componentes React reutilizables
+â¼¼â¼¤ lib/                # Utilidades (crawler, db, meilisearch)
+â¼¼â¼¤ drizzle/            # Schema de base de datos
+â¼¼â¼¤ public/             # Assets estÃ¡ticos
+â¼¼â¼¤ package.json
+â¼¼â¼¤ next.config.ts
+â¼¼â¼¤ tsconfig.json
+â¼¼â¼¤ tailwind.config.ts
+â¼¼â¼¤ Dockerfile
+â¼¼â¼¤ .env.example
+â¼¼â¼¤ README.md
+```
+
+## PrÃ³ximos pasos
+
+1. Subir archivos del proyecto Next.js desde Drive
+2. Integrar con el backend Python existente
+3. Unificar esquema de base de datos
+4. Configurar autenticaciÃ³n compartida
+
+## Estado
+
+ð¡µ¡­ Pendiente: Subir archivos completos del frontend
