@@ -42,3 +42,10 @@ meili_data/
 
 # PostgreSQL
 pg_data/
+
+# Node / Next
+node_modules/
+.next/
+
+# Netlify
+.netlify/

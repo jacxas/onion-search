@@ -3,8 +3,10 @@ SocksPort 9050
 ControlPort 9051
 
 # Hidden service para la interfaz web
+# El backend FastAPI escucha en el puerto 8000 del host "backend"
+# (red docker onion-net). Antes apuntaba a 127.0.0.1:80, donde no corre nada.
 HiddenServiceDir /var/lib/tor/hidden_service/
-HiddenServicePort 80 127.0.0.1:80
+HiddenServicePort 80 backend:8000
 
 # Logs (opcional, para debugging)
 Log notice stdout

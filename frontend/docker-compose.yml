@@ -1,1 +1,52 @@
-// Contenido de docker-compose.yml (1.2KB) - Orquestacin Docker
+services:
+  db:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: faro
+      POSTGRES_PASSWORD: faro
+      POSTGRES_DB: faro
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U faro -d faro"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  tor:
+    image: dperson/torproxy:latest
+    volumes:
+      - ./torrc.example:/etc/tor/torrc:ro
+      - tordata:/var/lib/tor
+    restart: unless-stopped
+
+  app:
+    build: .
+    depends_on:
+      db:
+        condition: service_healthy
+      tor:
+        condition: service_started
+    environment:
+      DATABASE_URL: postgres://faro:faro@db:5432/faro
+      CRAWL_MODE: live
+      TOR_SOCKS_PROXY: socks5h://tor:9050
+      # TOR_SEED_URLS: "http://<hub1>.onion/,http://<hub2>.onion/"
+      # ADMIN_TOKEN: "cambiame"
+    ports:
+      - "3000:3000"   # acceso clearnet local (la interfaz onion sale por tor:9050)
+
+  # aplicar el esquema una sola vez
+  migrate:
+    build: .
+    command: npx drizzle-kit push --force
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgres://faro:faro@db:5432/faro
+    profiles: ["migrate"]
+
+volumes:
+  pgdata:
+  tordata:

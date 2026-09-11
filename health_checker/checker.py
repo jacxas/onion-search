@@ -38,9 +38,27 @@ class HealthChecker:
         self.check_interval = check_interval
         self.batch_size = batch_size
         
+        # rdns: resolver DNS a través del proxy (equivalente a socks5h),
+        # obligatorio para dominios .onion
         self.connector = ProxyConnector.from_url(
-            f'socks5://{self.socks_host}:{self.socks_port}'
+            f'socks5://{self.socks_host}:{self.socks_port}',
+            rdns=True
         )
+        
+        # Blocklist desde la DB (además del archivo)
+        self.blocked_urls: set = set()
+        self._load_db_blocklist()
+    
+    def _load_db_blocklist(self):
+        """Cargar blocklist desde la base de datos."""
+        try:
+            from db.models import Blocklist
+            with get_db() as db:
+                self.blocked_urls = {b.url for b in db.query(Blocklist).all()}
+            if self.blocked_urls:
+                logger.info(f"Blocklist DB cargada: {len(self.blocked_urls)} URLs")
+        except Exception as e:
+            logger.warning(f"No se pudo cargar blocklist DB: {str(e)}")
     
     async def check_site(self, session: aiohttp.ClientSession, url: str) -> Dict:
         """Verificar salud de un sitio individual."""
@@ -104,7 +122,8 @@ class HealthChecker:
                     desc(OnionSite.last_checked).nullsfirst()
                 ).limit(self.batch_size * 2).all()
                 
-                urls = [s.url for s in sites]
+                # Excluir blocklist de la DB
+                urls = [s.url for s in sites if s.url not in self.blocked_urls]
                 logger.info(f"Cargados {len(urls)} sitios para verificar")
                 return urls
                 
@@ -117,14 +136,15 @@ class HealthChecker:
         try:
             with get_db() as db:
                 for r in results:
-                    if r.get('error') and r['error'] == 'timeout':
-                        continue
+                    # Los timeouts SÍ cuentan como caída (antes se saltaban y
+                    # dejaban el uptime inflado con sitios muertos)
+                    online = bool(r.get('online'))
                     
                     site = db.query(OnionSite).filter(OnionSite.url == r['url']).first()
                     
                     if site:
                         site.update_uptime(
-                            is_online=r['online'],
+                            is_online=online,
                             response_time=r['response_time']
                         )
                         site.status_code = r['status_code']
@@ -134,12 +154,12 @@ class HealthChecker:
                             url=r['url'],
                             title=r['url'],
                             content_hash='unknown',
-                            online=r['online'],
+                            online=online,
                             status_code=r['status_code'],
                             response_time=r['response_time'],
                             last_checked=datetime.utcnow()
                         )
-                        site.update_uptime(is_online=r['online'], response_time=r['response_time'])
+                        site.update_uptime(is_online=online, response_time=r['response_time'])
                         db.add(site)
                 
                 db.commit()

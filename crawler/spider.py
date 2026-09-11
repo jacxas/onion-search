@@ -10,10 +10,10 @@ from urllib.parse import urlparse
 import hashlib
 
 from bs4 import BeautifulSoup
-from tor_session import TorCrawlerSession
-from meili_client import create_indexer
-from database import get_db, init_db
-from models import OnionSite, Blocklist
+from crawler.tor_session import TorCrawlerSession
+from indexer.meili_client import create_indexer
+from db.database import get_db, init_db
+from db.models import OnionSite, Blocklist
 
 # Configurar logging
 logging.basicConfig(
@@ -66,16 +66,27 @@ class OnionSpider:
         init_db()
     
     def _load_blocklist(self):
-        """Cargar blocklist desde archivo."""
+        """Cargar blocklist desde archivo y desde la base de datos."""
         try:
             with open('blocklist.txt', 'r') as f:
                 for line in f:
                     url = line.strip()
                     if url and not url.startswith('#'):
                         self.blocklist_urls.add(url)
-            logger.info(f"Blocklist cargada: {len(self.blocklist_urls)} URLs")
+            logger.info(f"Blocklist archivo cargada: {len(self.blocklist_urls)} URLs")
         except FileNotFoundError:
             logger.warning("blocklist.txt no encontrado")
+        
+        # Blocklist gestionada desde el admin dashboard (tabla blocklist)
+        try:
+            with get_db() as db:
+                db_blocked = db.query(Blocklist).all()
+                for b in db_blocked:
+                    self.blocklist_urls.add(b.url)
+            if db_blocked:
+                logger.info(f"Blocklist DB cargada: {len(db_blocked)} URLs")
+        except Exception as e:
+            logger.warning(f"No se pudo cargar blocklist DB: {str(e)}")
     
     def _load_seed_list(self, filepath: str = 'seed_list.txt'):
         """Cargar URLs iniciales desde archivo."""

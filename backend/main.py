@@ -3,6 +3,7 @@ Backend API para el motor de búsqueda onion con admin dashboard profesional.
 """
 import os
 import hashlib
+import hmac
 from typing import List, Optional
 from datetime import datetime, timedelta
 from contextlib import asynccontextmanager
@@ -18,8 +19,13 @@ from db.database import get_db, init_db
 from db.models import OnionSite, Blocklist
 from indexer.meili_client import create_indexer
 
-# Admin token desde env
-ADMIN_TOKEN = os.getenv('ADMIN_TOKEN', 'admin-secret-token')
+# Admin token desde env.
+# Sin default: si no está configurado, el dashboard queda bloqueado
+# (antes caía a 'admin-secret-token' y cualquiera entraba).
+ADMIN_TOKEN = os.getenv('ADMIN_TOKEN', '')
+
+def _admin_token_configured() -> bool:
+    return bool(ADMIN_TOKEN.strip())
 
 # Inicializar app
 @asynccontextmanager
@@ -48,9 +54,12 @@ meili = create_indexer()
 
 def verify_admin(request: Request):
     """Verificar token de admin en cookie o header."""
+    if not _admin_token_configured():
+        raise HTTPException(status_code=503, detail="ADMIN_TOKEN no configurado")
+    
     token = request.cookies.get('admin_token') or request.headers.get('X-Admin-Token')
     
-    if not token or hashlib.sha256(token.encode()).hexdigest() != hashlib.sha256(ADMIN_TOKEN.encode()).hexdigest():
+    if not token or not hmac.compare_digest(token.encode(), ADMIN_TOKEN.encode()):
         raise HTTPException(status_code=401, detail="Unauthorized")
     
     return True
@@ -93,8 +102,9 @@ class DashboardStats(BaseModel):
 async def index(request: Request):
     """Interfaz pública de búsqueda."""
     return templates.TemplateResponse(
+        request,
         "search.html",
-        {"request": request, "query": "", "results": [], "total": 0}
+        { "query": "", "results": [], "total": 0}
     )
 
 
@@ -108,12 +118,15 @@ async def search_html(
     """BÃºsqueda pÃºblica con interfaz."""
     if not q:
         return templates.TemplateResponse(
-            "search.html",
-            {"request": request, "query": "", "results": [], "total": 0}
+        request,
+        "search.html",
+        { "query": "", "results": [], "total": 0}
         )
     
     offset = (page - 1) * 20
-    meili_results = meili.search(query=q, limit=20, offset=offset)
+    # Buscar un set amplio, ordenarlo por uptime y paginar encima
+    # (ordenar después de paginar reordenaba solo el subconjunto de la página)
+    meili_results = meili.search(query=q, limit=200, offset=0)
     hits = meili_results.get('hits', [])
     
     with get_db() as db:
@@ -133,14 +146,16 @@ async def search_html(
                 })
         
         results.sort(key=lambda x: -x['uptime_ratio'])
+        total = len(results)
+        results = results[offset:offset + 20]
     
     return templates.TemplateResponse(
+        request,
         "search.html",
         {
-            "request": request,
             "query": q,
             "results": results,
-            "total": len(results),
+            "total": total,
             "page": page
         }
     )
@@ -154,7 +169,8 @@ async def search_api(
 ):
     """API de bÃºsqueda pÃºblica."""
     offset = (page - 1) * 20
-    meili_results = meili.search(query=q, limit=20, offset=offset)
+    # Set amplio, orden global, luego paginación (igual que la vista HTML)
+    meili_results = meili.search(query=q, limit=200, offset=0)
     hits = meili_results.get('hits', [])
     
     with get_db() as db:
@@ -175,8 +191,10 @@ async def search_api(
                 ))
         
         results.sort(key=lambda x: (-x.uptime_ratio, x.avg_response_time or 999))
+        total = len(results)
+        results = results[offset:offset + 20]
     
-    return SearchResponse(query=q, results=results, total=len(results), page=page)
+    return SearchResponse(query=q, results=results, total=total, page=page)
 
 
 # ==================== ADMIN DASHBOARD ====================
@@ -184,18 +202,28 @@ async def search_api(
 @app.get("/admin/login", response_class=HTMLResponse)
 async def admin_login(request: Request):
     """Login del admin dashboard."""
-    return templates.TemplateResponse("admin_login.html", {"request": request, "error": None})
+    return templates.TemplateResponse(
+        request,
+        "admin_login.html",
+        { "error": None})
 
 
 @app.post("/admin/login", response_class=RedirectResponse)
 async def admin_login_post(request: Request, token: str = Form(...)):
     """Verificar login y redirigir al dashboard."""
-    if hashlib.sha256(token.encode()).hexdigest() == hashlib.sha256(ADMIN_TOKEN.encode()).hexdigest():
+    if _admin_token_configured() and hmac.compare_digest(token.encode(), ADMIN_TOKEN.encode()):
         response = RedirectResponse(url="/admin", status_code=302)
-        response.set_cookie(key='admin_token', value=token, httponly=True, max_age=3600)
+        response.set_cookie(
+            key='admin_token', value=token, httponly=True,
+            secure=os.getenv('SECURE_COOKIES', 'false').lower() == 'true',
+            samesite='lax', max_age=3600
+        )
         return response
     else:
-        return templates.TemplateResponse("admin_login.html", {"request": request, "error": "Token invÃ¡lido"})
+        return templates.TemplateResponse(
+        request,
+        "admin_login.html",
+        { "error": "Token invÃ¡lido"})
 
 
 @app.get("/admin", response_class=HTMLResponse)
@@ -216,7 +244,7 @@ async def admin_dashboard(request: Request, _: bool = Depends(verify_admin)):
         
         try:
             meili_stats = meili.get_stats()
-            indexed = meili_stats.get('numberOfDocuments', 0)
+            indexed = getattr(meili_stats, 'number_of_documents', 0)
         except:
             indexed = 0
     
@@ -232,8 +260,9 @@ async def admin_dashboard(request: Request, _: bool = Depends(verify_admin)):
     }
     
     return templates.TemplateResponse(
+        request,
         "admin_dashboard.html",
-        {"request": request, "stats": stats}
+        { "stats": stats}
     )
 
 
@@ -266,9 +295,9 @@ async def admin_sites(
         total = query.count()
     
     return templates.TemplateResponse(
+        request,
         "admin_sites.html",
         {
-            "request": request,
             "sites": sites,
             "page": page,
             "total": total,
@@ -285,8 +314,9 @@ async def admin_blocklist(request: Request, _: bool = Depends(verify_admin)):
         blocked = db.query(Blocklist).order_by(desc(Blocklist.added_at)).all()
     
     return templates.TemplateResponse(
+        request,
         "admin_blocklist.html",
-        {"request": request, "blocked": blocked}
+        { "blocked": blocked}
     )
 
 
@@ -327,8 +357,9 @@ async def admin_blocklist_remove(
 async def admin_reports(request: Request, _: bool = Depends(verify_admin)):
     """Reportes de usuarios (placeholder)."""
     return templates.TemplateResponse(
+        request,
         "admin_reports.html",
-        {"request": request, "reports": []}
+        { "reports": []}
     )
 
 
@@ -336,8 +367,9 @@ async def admin_reports(request: Request, _: bool = Depends(verify_admin)):
 async def admin_actions(request: Request, _: bool = Depends(verify_admin)):
     """Acciones rÃ¡pidas: forzar crawl, health check."""
     return templates.TemplateResponse(
+        request,
         "admin_actions.html",
-        {"request": request, "message": None}
+        { "message": None}
     )
 
 
@@ -376,7 +408,7 @@ async def api_admin_stats(_: bool = Depends(verify_admin)):
         
         try:
             meili_stats = meili.get_stats()
-            indexed = meili_stats.get('numberOfDocuments', 0)
+            indexed = getattr(meili_stats, 'number_of_documents', 0)
         except:
             indexed = 0
     
