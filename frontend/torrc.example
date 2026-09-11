@@ -1,0 +1,24 @@
+# ── torrc para el nodo de FARO ────────────────────────────────────────────
+# Copiá este archivo a /etc/tor/torrc (o montalo en el contenedor tor).
+#
+# 1) Proxy SOCKS5 para el crawler (salida). Con socks5h, la resolución del
+#    nombre .onion ocurre al final del circuito, nunca por DNS público.
+SocksPort 0.0.0.0:9050
+SocksPolicy accept 127.0.0.0/8
+SocksPolicy accept 172.16.0.0/12
+SocksPolicy reject *
+
+# 2) Servicio oculto v3 que expone la interfaz web de FARO como .onion.
+#    Apunta al puerto 3000 del contenedor/proceso `app`.
+HiddenServiceDir /var/lib/tor/faro/
+HiddenServicePort 80 app:3000
+HiddenServiceVersion 3
+
+# 3) Endurecimiento básico
+AvoidDiskWrites 1
+DisableDebuggerAttachment 1
+SafeLogging 1
+Log notice stdout
+
+# Tras reiniciar tor, la dirección queda en:
+#   cat /var/lib/tor/faro/hostname

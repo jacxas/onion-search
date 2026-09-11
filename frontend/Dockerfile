@@ -1,47 +1,31 @@
-# Frontend Next.js - Dockerfile
-FROM node:20-alpine AS base
-
-# Install dependencies only when needed
-FROM base AS deps
-RUN apk add --no-cache libc6-compat
+# ── FARO · motor de búsqueda .onion ──────────────────────────────────────
+FROM node:22-alpine AS deps
 WORKDIR /app
-
-# Copy package files
 COPY package.json package-lock.json* ./
 RUN npm ci
 
-# Rebuild the source code only when needed
-FROM base AS builder
+FROM node:22-alpine AS builder
 WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
-
-# Disable telemetry
 ENV NEXT_TELEMETRY_DISABLED=1
-
-# Build Next.js
+# DATABASE_URL solo se necesita en runtime, no en build
 RUN npm run build
 
-# Production image, copy all the files and run next
-FROM base AS runner
+FROM node:22-alpine AS runner
 WORKDIR /app
-
-ENV NODE_ENV=production
-ENV NEXT_TELEMETRY_DISABLED=1
-
-RUN addgroup --system --gid 1001 nodejs
-RUN adduser --system --uid 1001 nextjs
-
-# Copy built application
+ENV NODE_ENV=production NEXT_TELEMETRY_DISABLED=1
+RUN addgroup -S faro && adduser -S faro -G faro
 COPY --from=builder /app/public ./public
-COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
-COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
-
-USER nextjs
-
+COPY --from=builder /app/.next/standalone ./
+COPY --from=builder /app/.next/static ./.next/static
+USER faro
 EXPOSE 3000
-
 ENV PORT=3000
-ENV HOSTNAME="0.0.0.0"
-
+# Variables esperadas en runtime:
+#   DATABASE_URL      postgres://user:pass@db:5432/app_db
+#   CRAWL_MODE        live           (tor real) | sim (red simulada)
+#   TOR_SOCKS_PROXY   socks5h://tor:9050
+#   TOR_SEED_URLS     lista de semillas .onion separadas por comas (opcional)
+#   ADMIN_TOKEN       token para /api/admin/run (recomendado en producción)
 CMD ["node", "server.js"]

@@ -43,8 +43,8 @@ class MeiliIndexer:
         
         try:
             task = self.index.update_settings(settings)
-            self.client.wait_for_task(task['taskUid'])
-            logger.info(f"Ã¯ndice '{self.index_name}' configurado")
+            self.client.wait_for_task(task.task_uid)
+            logger.info(f"Ãndice '{self.index_name}' configurado")
         except Exception as e:
             logger.error(f"Error configurando Ã­ndice: {str(e)}")
     
@@ -52,7 +52,7 @@ class MeiliIndexer:
         """Agregar o actualizar documentos."""
         try:
             task = self.index.update_documents(documents, primary_key)
-            logger.info(f"Actualizados {len(documents)} documentos. Task: {task['taskUid']}")
+            logger.info(f"Actualizados {len(documents)} documentos. Task: {task.task_uid}")
             return task
         except Exception as e:
             logger.error(f"Error actualizando documentos: {str(e)}")
@@ -66,13 +66,13 @@ class MeiliIndexer:
         offset: int = 0
     ) -> Dict:
         """Buscar en el Ã­ndice."""
-        params = {'q': query, 'limit': limit, 'offset': offset}
+        params: Dict = {'limit': limit, 'offset': offset}
         
         if filters:
             params['filter'] = filters
         
         try:
-            results = self.index.search(**params)
+            results = self.index.search(query, params)
             return results
         except Exception as e:
             logger.error(f"Error buscando: {str(e)}")

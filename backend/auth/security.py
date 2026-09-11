@@ -1,6 +1,7 @@
 """
 MÃ³dulo de seguridad para autenticaciÃ³n, hashing, JWT y TOTP.
 """
+import os
 import secrets
 import io
 from datetime import datetime, timedelta
@@ -11,7 +12,9 @@ import pyotp
 import qrcode
 
 # Config
-SECRET_KEY = secrets.token_urlsafe(32)
+# La clave debe persistir entre reinicios (si rota, invalida todas las sesiones).
+# En desarrollo se genera una efímera como último recurso.
+SECRET_KEY = os.getenv('SECRET_KEY') or secrets.token_urlsafe(32)
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 60
 

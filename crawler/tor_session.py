@@ -49,6 +49,7 @@ class TorCrawlerSession:
         self.session = create_tor_session(socks_host, socks_port, timeout)
         self.timeout = timeout
         self.max_retries = max_retries
+        self._followed_redirects = 0
     
     @retry(
         stop=stop_after_attempt(3),
@@ -56,14 +57,30 @@ class TorCrawlerSession:
     )
     def get(self, url: str, timeout: Optional[int] = None) -> requests.Response:
         """
-        Hacer GET request con retries automÃ¡ticos.
+        Hacer GET request con retries automáticos.
+        Se siguen redirects (1 nivel) para no descartar sitios
+        que redirigen (http→https, variantes www).
         """
-        return self.session.get(
+        resp = self.session.get(
             url,
             timeout=timeout or self.timeout,
             allow_redirects=False
         )
+        
+        if resp.is_redirect or resp.is_perm_redirect:
+            redirect_url = resp.headers.get('Location')
+            if redirect_url:
+                from urllib.parse import urljoin
+                final_url = urljoin(url, redirect_url)
+                if self._followed_redirects < 2:
+                    self._followed_redirects += 1
+                    try:
+                        return self.get(final_url, timeout=timeout)
+                    finally:
+                        self._followed_redirects -= 1
+        
+        return resp
     
     def close(self):
-        """Cerrar sesiÃ³n."""
+        """Cerrar sesión."""
         self.session.close()
