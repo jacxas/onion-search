@@ -100,6 +100,14 @@ function buildNetwork(): SimHost[] {
     }
     hosts[i].links = [...links];
   }
+  // espejo determinista del hub 0 (mismo contenido exacto: valida dedupe/mirrors).
+  // Se descubre desde el hub 0 y copia SUS enlaces finales → HTML idéntico.
+  hosts[0].links.push(hosts.length);
+  hosts.push({
+    ...hosts[0],
+    domain: randomOnionHost(rng),
+    links: [...hosts[0].links],
+  });
   return hosts;
 }
 

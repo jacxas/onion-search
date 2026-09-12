@@ -1,0 +1,20 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "commonjs",
+    "moduleResolution": "node",
+    "lib": ["ES2022"],
+    "strict": true,
+    "skipLibCheck": true,
+    "esModuleInterop": true,
+    "resolveJsonModule": true,
+    "noEmit": false,
+    "declaration": false,
+    "outDir": ".worker-build",
+    "rootDir": ".",
+    "incremental": true,
+    "tsBuildInfoFile": ".worker-build/.tsbuildinfo",
+    "types": ["node"]
+  },
+  "include": ["worker/**/*.ts", "src/db/**/*.ts", "src/lib/**/*.ts", "src/crawler/**/*.ts"]
+}

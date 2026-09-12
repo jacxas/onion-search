@@ -42,15 +42,15 @@ export async function assignMirrorGroup(siteId: number, contentHash: string | nu
     .where(and(eq(sites.contentHash, contentHash), ne(sites.id, siteId)))
     .limit(1);
 
-  let groupId: number;
-  if (twins.length > 0) {
-    const twin = twins[0];
-    groupId = twin.groupId ?? Math.min(twin.id, siteId);
-    if (!twin.groupId) {
-      await db().update(sites).set({ mirrorGroupId: groupId }).where(eq(sites.id, twin.id));
-    }
-  } else {
-    groupId = siteId;
+  if (twins.length === 0) {
+    // sin gemelo: no pertenece a ningún grupo (limpia asignaciones previas)
+    await db().update(sites).set({ mirrorGroupId: null }).where(eq(sites.id, siteId));
+    return null;
+  }
+  const twin = twins[0];
+  const groupId = twin.groupId ?? Math.min(twin.id, siteId);
+  if (!twin.groupId) {
+    await db().update(sites).set({ mirrorGroupId: groupId }).where(eq(sites.id, twin.id));
   }
   await db().update(sites).set({ mirrorGroupId: groupId }).where(eq(sites.id, siteId));
   return groupId;

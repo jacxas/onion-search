@@ -56,26 +56,26 @@ export async function recordCheck(
   const d = db();
   await d.execute(sql`
     INSERT INTO health_checks (site_id, status_code, online, response_ms, error)
-    VALUES (${siteId}, ${result.statusCode}, ${result.online}, ${result.responseMs}, ${result.error})
+    VALUES (${siteId}::int, ${result.statusCode}::int, ${result.online}::boolean, ${result.responseMs}::int, ${result.error}::text)
   `);
   await d.execute(sql`
     UPDATE sites SET
-      online = ${result.online},
-      status_code = ${result.statusCode},
-      last_response_ms = ${result.responseMs},
+      online = ${result.online}::boolean,
+      status_code = ${result.statusCode}::int,
+      last_response_ms = ${result.responseMs}::int,
       avg_response_ms = CASE
-        WHEN ${result.online} AND ${result.responseMs} IS NOT NULL AND avg_response_ms IS NULL
-          THEN ${result.responseMs}
-        WHEN ${result.online} AND ${result.responseMs} IS NOT NULL
-          THEN round(0.3 * ${result.responseMs} + 0.7 * avg_response_ms)::int
+        WHEN ${result.online}::boolean AND ${result.responseMs}::int IS NOT NULL AND avg_response_ms IS NULL
+          THEN ${result.responseMs}::int
+        WHEN ${result.online}::boolean AND ${result.responseMs}::int IS NOT NULL
+          THEN round(0.3 * ${result.responseMs}::numeric + 0.7 * avg_response_ms::numeric)::int
         ELSE avg_response_ms
       END,
       total_checks = total_checks + 1,
       successful_checks = successful_checks + ${result.online ? 1 : 0},
       uptime_ratio = (successful_checks::float + ${result.online ? 1 : 0}) / (total_checks + 1),
       last_checked_at = now(),
-      last_online_at = CASE WHEN ${result.online} THEN now() ELSE last_online_at END
-    WHERE id = ${siteId}
+      last_online_at = CASE WHEN ${result.online}::boolean THEN now() ELSE last_online_at END
+    WHERE id = ${siteId}::int
   `);
   // mantener solo los últimos 100 checks por sitio
   await d.execute(sql`

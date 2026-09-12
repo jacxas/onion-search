@@ -26,10 +26,10 @@ export async function enqueue(urls: string[], depth: number, priority: number): 
   const res = await db().execute(sql`
     INSERT INTO crawl_queue (url, domain, depth, priority)
     SELECT * FROM unnest(
-      ${rows.map((r) => r.url)}::text[],
-      ${rows.map((r) => r.domain)}::varchar(64)[],
-      ${rows.map((r) => r.depth)}::int[],
-      ${rows.map((r) => r.priority)}::int[]
+      ${sql.param(rows.map((r) => r.url))}::text[],
+      ${sql.param(rows.map((r) => r.domain))}::varchar(64)[],
+      ${sql.param(rows.map((r) => r.depth))}::int[],
+      ${sql.param(rows.map((r) => r.priority))}::int[]
     )
     ON CONFLICT (url) DO NOTHING
   `);
@@ -37,12 +37,23 @@ export async function enqueue(urls: string[], depth: number, priority: number): 
   return (res as unknown as { rowCount?: number }).rowCount ?? rows.length;
 }
 
-/** Marca semillas en sites (is_seed) y las encola con prioridad máxima. */
+/**
+ * Marca semillas en sites (is_seed) y las encola con prioridad máxima.
+ * Las semillas ya procesadas se resetean a pending: cada corrida del
+ * pipeline re-rastrea los hubs (frecuencia de actualización).
+ */
 export async function seedQueue(seedUrls: string[]): Promise<number> {
   const n = await enqueue(seedUrls, 0, 10);
   const normalized = seedUrls
     .map((u) => normalizeOnionUrl(u))
     .filter((r): r is Extract<typeof r, { ok: true }> => r.ok);
+  const seedUrlsNorm = normalized.map((s) => s.url);
+  if (seedUrlsNorm.length) {
+    await db().execute(sql`
+      UPDATE crawl_queue SET status = 'pending', attempts = 0, last_error = NULL
+      WHERE url = ANY(${sql.param(seedUrlsNorm)}::text[]) AND status IN ('done', 'failed')
+    `);
+  }
   for (const s of normalized) {
     await db().execute(sql`
       INSERT INTO sites (domain, url, is_seed)

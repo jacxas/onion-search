@@ -6,7 +6,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint .",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "worker": "tsc -p tsconfig.worker.json && node .worker-build/worker/crawler.js"
   },
   "dependencies": {
     "@types/nodemailer": "^8.0.1",

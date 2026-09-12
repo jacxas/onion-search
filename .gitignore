@@ -30,3 +30,6 @@ yarn-error.log*
 # SO
 .DS_Store
 Thumbs.db
+
+# worker build
+.worker-build
