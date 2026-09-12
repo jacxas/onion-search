@@ -20,8 +20,7 @@
     "nodemailer": "^10.0.1",
     "pg": "8.20.0",
     "react": "19.2.6",
-    "react-dom": "19.2.6",
-    "socks-proxy-agent": "^10.1.0"
+    "react-dom": "19.2.6"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "4.1.17",
