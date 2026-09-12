@@ -1,122 +1,52 @@
-version: '3.8'
-
 services:
-  tor:
-    build:
-      context: ./docker
-      dockerfile: Dockerfile
-    container_name: onion-search-tor
-    restart: unless-stopped
-    volumes:
-      - tor_data:/var/lib/tor
-      - ./config/torrc:/etc/tor/torrc:ro
-    ports:
-      - "9050:9050"
-      - "9051:9051"
-      - "8080:80"
-    networks:
-      - onion-net
-
-  meilisearch:
-    image: getmeili/meilisearch:v1.6
-    container_name: onion-search-meili
-    restart: unless-stopped
-    environment:
-      - MEILI_MASTER_KEY=${MEILI_MASTER_KEY:-dev-master-key}
-      - MEILI_ENV=production
-    volumes:
-      - meili_data:/meili_data
-    networks:
-      - onion-net
-
   db:
-    image: postgres:15-alpine
-    container_name: onion-search-db
-    restart: unless-stopped
+    image: postgres:17-alpine
     environment:
-      - POSTGRES_USER=postgres
-      - POSTGRES_PASSWORD=${DB_PASSWORD:-postgres}
-      - POSTGRES_DB=onion_search
+      POSTGRES_USER: faro
+      POSTGRES_PASSWORD: faro
+      POSTGRES_DB: faro
     volumes:
-      - pg_data:/var/lib/postgresql/data
-    networks:
-      - onion-net
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U faro -d faro"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
 
-  crawler:
-    build:
-      context: .
-      dockerfile: docker/Dockerfile
-    container_name: onion-search-crawler
+  tor:
+    image: dperson/torproxy:latest
+    volumes:
+      - ./torrc.example:/etc/tor/torrc:ro
+      - tordata:/var/lib/tor
     restart: unless-stopped
+
+  app:
+    build: .
     depends_on:
-      - tor
-      - meilisearch
-      - db
+      db:
+        condition: service_healthy
+      tor:
+        condition: service_started
     environment:
-      - TOR_SOCKS_HOST=tor
-      - TOR_SOCKS_PORT=9050
-      - MEILI_URL=http://meilisearch:7700
-      - MEILI_MASTER_KEY=${MEILI_MASTER_KEY:-dev-master-key}
-      - DATABASE_URL=postgresql://postgres:${DB_PASSWORD:-postgres}@db:5432/onion_search
-    volumes:
-      - ./crawler:/app/crawler
-      - ./seed_list.txt:/app/seed_list.txt:ro
-      - ./blocklist.txt:/app/blocklist.txt:ro
-    networks:
-      - onion-net
-    command: python -m crawler.spider
-
-  health_checker:
-    build:
-      context: .
-      dockerfile: docker/Dockerfile
-    container_name: onion-search-health
-    restart: unless-stopped
-    depends_on:
-      - tor
-      - db
-    environment:
-      - TOR_SOCKS_HOST=tor
-      - TOR_SOCKS_PORT=9050
-      - DATABASE_URL=postgresql://postgres:${DB_PASSWORD:-postgres}@db:5432/onion_search
-      - HEALTH_CHECK_INTERVAL=3600
-      - HEALTH_CHECK_TIMEOUT=15
-    volumes:
-      - ./health_checker:/app/health_checker
-    networks:
-      - onion-net
-    command: python -m health_checker.checker
-
-  backend:
-    build:
-      context: .
-      dockerfile: docker/Dockerfile
-    container_name: onion-search-backend
-    restart: unless-stopped
-    depends_on:
-      - tor
-      - meilisearch
-      - db
+      DATABASE_URL: postgres://faro:faro@db:5432/faro
+      CRAWL_MODE: live
+      TOR_SOCKS_PROXY: socks5h://tor:9050
+      # TOR_SEED_URLS: "http://<hub1>.onion/,http://<hub2>.onion/"
+      # ADMIN_TOKEN: "cambiame"
     ports:
-      - "8000:8000"
+      - "3000:3000"   # acceso clearnet local (la interfaz onion sale por tor:9050)
+
+  # aplicar el esquema una sola vez
+  migrate:
+    build: .
+    command: npx drizzle-kit push --force
+    depends_on:
+      db:
+        condition: service_healthy
     environment:
-      - TOR_SOCKS_HOST=tor
-      - TOR_SOCKS_PORT=9050
-      - MEILI_URL=http://meilisearch:7700
-      - MEILI_MASTER_KEY=${MEILI_MASTER_KEY:-dev-master-key}
-      - DATABASE_URL=postgresql://postgres:${DB_PASSWORD:-postgres}@db:5432/onion_search
-      - ADMIN_TOKEN=${ADMIN_TOKEN:-admin-secret-token}
-    volumes:
-      - ./backend:/app/backend
-    networks:
-      - onion-net
-    command: uvicorn backend.main:app --host 0.0.0.0 --port 8000
+      DATABASE_URL: postgres://faro:faro@db:5432/faro
+    profiles: ["migrate"]
 
 volumes:
-  tor_data:
-  meili_data:
-  pg_data:
-
-networks:
-  onion-net:
-    driver: bridge
+  pgdata:
+  tordata:

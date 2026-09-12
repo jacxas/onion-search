@@ -1,167 +1,101 @@
-# Onion Search Engine
+# FARO — motor de búsqueda para servicios .onion
 
-Motor de búsqueda para la red Tor (.onion) enfocado en fiabilidad, uptime tracking y deduplicaciÃ³n.
+Buscador fullstack para la red Tor con las piezas que hacen fallar a los motores
+tradicionales **ya resueltas**:
 
-## CaracterÃ¬sticas
+| Pieza | Implementación |
+|---|---|
+| Descubrimiento | cola de rastreo con semillas + extracción de enlaces por página |
+| Crawling | fetch vía proxy **SOCKS5** (`socks5h`, DNS remoto), timeouts largos, backoff exponencial, límites de profundidad y por dominio |
+| Filtrado | blocklist por **dominio / hash / keyword** + reportes de usuarios |
+| Indexación | PostgreSQL FTS (`tsvector` + `websearch_to_tsquery`) |
+| Deduplicación | fingerprint SHA-256 del contenido normalizado → **espejos agrupados** |
+| Salud | health checker con historial, uptime (últimos 100 checks), timeouts adaptativos |
+| Retrieval | ranking = relevancia × uptime + boost si está en línea − castigo si está caído |
+| Interfaz | Next.js, modo oscuro terminal, resultados con estado verificado |
+| Seguridad | login admin (scrypt + sesiones firmadas), CSRF, rate-limit, alertas por email |
 
-- âœ… Crawler Tor-aware con retries automÃ¡ticos
-- âœ… Health checker en tiempo real
-- âœ… DeduplicaciÃ³n de mirrors por content hash
-- âœ… Uptime tracking y scoring
-- âœ… Blocklists para contenido ilegal
-- âœ… Ãndice fresco con invalidaciÃ³n automÃ¡tica
-- âœ… Interfaz web minimalista sin JS pesado
-- âœ… Admin dashboard para gestiÃ³n
+## Seguridad del panel
 
-## Stack
+- `/ops` y todas las acciones de mutación exigen sesión (`/login`).
+- Contraseñas con **scrypt** (sal aleatoria, comparación `timingSafeEqual`).
+- Sesiones: token aleatorio de 256 bits en cookie httpOnly; en la DB solo su
+  hash SHA-256; expiración 7 días; cambio de clave invalida otras sesiones.
+- Rate-limit de login: 6 intentos / 10 min por email.
+- `CSRF_ENABLED=true` valida Origin same-origin en endpoints con cookie; las
+  server actions ya traen validación de Origin propia de Next.
+- `SECURE_COOKIES=true` solo en producción con HTTPS.
+- Admin inicial desde `ADMIN_INITIAL_EMAIL` / `ADMIN_INITIAL_PASSWORD`
+  (default `admin@faro.local` / `faro-admin-123` — cambiarla en el primer login).
 
-- **Crawler**: Python + `requests[socks]` + `tenacity`
-- **Health Checker**: Python + `asyncio` + `aiohttp`
-- **Ã¯ndice**: Meilisearch
-- **DB**: PostgreSQL (uptime, blocklists, reports)
-- **Backend**: FastAPI
-- **Frontend**: HTML + HTMX
-- **Deployment**: Docker
+## Alertas por email (opcional)
+
+Con `MAIL_USERNAME` + `MAIL_PASSWORD` (Gmail App Password o SMTP genérico con
+`MAIL_HOST`) definidos, FARO avisa a `MAIL_ALERT_TO` cuando:
+
+- un servicio estable pasa a **offline** (o se recupera),
+- el crawler aplica un **bloqueo** de blocklist,
+- un usuario envía un **reporte**.
+
+Throttle incorporado para no repetir alertas de hosts inestables.
 
 ## Estructura
 
 ```
-onion-search/
-â¼¼â¼¤ crawler/
-â¼º  ââ¼¤ __init__.py
-â¼º  ââ¼¤ tor_session.py
-â¼º  ââ¼¤ spider.py
-â¼º  ââ¼¤ extractor.py
-â¼¼â¼¤ health_checker/
-â¼º  ââ¼¤ __init__.py
-â¼º  ââ¼¤ checker.py
-â¼¼â¼¤ indexer/
-â¼º  ââ¼¤ __init__.py
-â¼º  ââ¼¤ meili_client.py
-â¼¼â¼¤ backend/
-â¼º  ââ¼¤ __init__.py
-â¼º  ââ¼¤ main.py
-â¼º  ââ¼¤ admin.py
-â¼º  ââ¼¤ templates/
-â¼¼â¼¤ db/
-â¼º  ââ¼¤ models.py
-â¼º  ââ¼¤ database.py
-â¼¼â¼¤ config/
-â¼º  ââ¼¤ torrc
-â¼º  ââ¼¤ settings.py
-â¼¼â¼¤ docker/
-â¼º  ââ¼¤ Dockerfile
-â¼º  ââ¼¤ docker-compose.yml
-â¼º  ââ¼¤ tor-entrypoint.sh
-â¼¼â¼¤ seed_list.txt
-â¼¼â¼¤ blocklist.txt
-â¼¼â¼¤ requirements.txt
-â¼¼â¼¤ .env.example
-â¼¼â¼¤ .gitignore
-â¼¼â¼¤ README.md
+src/lib/onion.ts            validación/normalización .onion, fingerprints, PRNG
+src/lib/tor/transport.ts    transporte SOCKS5 (live) + sim
+src/lib/tor/sim.ts          red onion simulada determinista (~46 hosts enlazados)
+src/lib/crawler/parse.ts    extracción HTML (cheerio): título, texto, enlaces
+src/lib/crawler/pipeline.ts orquestación: seed → crawl → dedupe → health
+src/lib/search.ts           FTS + ranking + stats
+src/lib/auth.ts             scrypt, sesiones, guards, rate-limit de login
+src/lib/mail.ts             alertas por email (nodemailer/Gmail/SMTP)
+src/app/api/search          búsqueda pública (ranking por uptime)
+src/app/api/admin/run       disparar crawler/sweep/seed (token o sesión)
+src/app/login               acceso admin
+src/app/ops                 centro de mando (protegido: sesión obligatoria)
+src/app/sitio/[domain]      ficha de nodo: historial, espejos, páginas, acciones
 ```
 
-## InstalaciÃ³n rÃ¡pida
+## Modo simulado vs modo live
+
+- `CRAWL_MODE=sim` (default): no requiere Tor. La red de `sim.ts` es
+  determinista: los mismos dominios, contenidos, latencias y caídas en cada
+  ejecución. Sirve para verificar todo el pipeline de punta a punta.
+- `CRAWL_MODE=live`: el crawler enruta todo por `TOR_SOCKS_PROXY`
+  (`socks5h://127.0.0.1:9050` por defecto).
+
+## Despliegue real (Docker)
 
 ```bash
-# Clonar repo
-git clone https://github.com/jacxas/onion-search.git
-cd onion-search
-
-# Copiar env
-cp .env.example .env
-
-# Iniciar con Docker
-docker-compose up -d
-
-# Ver logs
-docker-compose logs -f crawler
-docker-compose logs -f health_checker
+docker compose --profile migrate up migrate   # aplica el esquema
+docker compose up -d --build                   # app + postgres + tor
+docker compose exec tor cat /var/lib/tor/faro/hostname   # tu dirección .onion
 ```
 
-## ConfiguraciÃ³n
+El compose incluye:
+- **app** (Next.js standalone), **db** (Postgres 17), **tor** con `torrc.example`
+  montado (SOCKS5 saliente + servicio oculto v3 hacia `app:3000`).
 
-Editar `.env`:
+Semillas en live: definí `TOR_SEED_URLS` con hubs conocidos, o agregá semillas
+desde el panel `/ops`.
 
-```env
-# Tor
-TOR_SOCKS_HOST=127.0.0.1
-TOR_SOCKS_PORT=9050
-
-# Meilisearch
-MEILI_URL=http://meilisearch:7700
-MEILI_MASTER_KEY=tu-master-key
-
-# PostgreSQL
-DATABASE_URL=postgresql://postgres:password@db:5432/onion_search
-
-# Crawler
-CRAWLER_CONCURRENCY=2
-CRAWLER_TIMEOUT=30
-CRAWLER_MAX_PAGES=1000
-
-# Health checker
-HEALTH_CHECK_INTERVAL=3600
-HEALTH_CHECK_TIMEOUT=15
-
-# Admin dashboard
-ADMIN_TOKEN=tu-token-secreto
-```
-
-## Uso
-
-### Agregar seed list
-
-Editar `seed_list.txt` con direcciones .onion iniciales.
-
-### Ver interfaz
-
-Acceder a `http://localhost:8080` (interfaz web) o `http://localhost:8000/admin` (admin dashboard).
-
-### API
+## Desarrollo local
 
 ```bash
-# Buscar
-curl "http://localhost:8000/api/search?q=crypto"
-
-# Verificar sitio
-curl "http://localhost:8000/api/health?url=http://example.onion"
-
-# Stats
-curl "http://localhost:8000/api/stats"
+npm install
+npx drizzle-kit push        # crea las tablas
+npm run dev                 # http://localhost:3000 (modo sim)
 ```
 
-## Admin Dashboard
+La primera visita a `/` siembra los hubs y ejecuta un lote de rastreo +
+health sweep, así el índice se puebla solo.
 
-Acceder a `http://localhost:8000/admin` con el token configurado en `ADMIN_TOKEN`.
+## Notas de operación
 
-Funcionalidades:
-- MÃ©tricas en tiempo real
-- GestiÃ³n de blocklist
-- Reportes de usuarios
-- BÃºsqueda y administraciÃ³n de sitios
-- Forzar crawls y health checks
-
-## Desarrollo
-
-```bash
-# Instalar dependencias
-pip install -r requirements.txt
-
-# Correr crawler localmente
-python -m crawler.spider
-
-# Correr health checker
-python -m health_checker.checker
-
-# Backend
-uvicorn backend.main:app --reload --host 0.0.0.0 --port 8000
-```
-
-## Blocklists
-
-Agregar dominios bloqueados en `blocklist.txt` (uno por lÃ¬nea).
-
-## Licencia
-
-MIT
+- El crawler es secuencial y cortés (timeouts largos, reintentos limitados):
+  los servicios onion son lentos e inestables por diseño.
+- Los sitios caídos quedan indexados pero penalizados en el ranking; el filtro
+  «solo en línea» los excluye.
+- `ADMIN_TOKEN` protege `/api/admin/run` en producción.
+- Revisá la legislación de tu jurisdicción antes de rastrear la dark web.
