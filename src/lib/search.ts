@@ -37,13 +37,8 @@ export interface SearchStats {
 }
 
 const tsvectorExpr = sql`to_tsvector('simple', coalesce(p.title, '') || ' ' || coalesce(p.description, '') || ' ' || p.content)`;
-
-/** Crea el índice GIN de FTS si no existe (idempotente). */
-export async function ensureSearchIndexes(): Promise<void> {
-  await db().execute(
-    sql`CREATE INDEX IF NOT EXISTS pages_fts_idx ON pages USING gin (to_tsvector('simple', coalesce(title, '') || ' ' || coalesce(description, '') || ' ' || content))`
-  );
-}
+// Índice GIN pages_fts_idx: definido en src/db/schema.ts y creado por la
+// migración (drizzle-kit push). NO depende del worker (DB-01).
 
 /**
  * Búsqueda pública por FTS con ranking por salud.

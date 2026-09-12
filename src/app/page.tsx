@@ -1,8 +1,5 @@
 import Link from "next/link";
 import { searchPages, getStats } from "@/lib/search";
-import { runPipeline } from "@/crawler/pipeline";
-import { healthSweep } from "@/crawler/health";
-import { getTransport } from "@/lib/tor/transport";
 
 export const dynamic = "force-dynamic";
 
@@ -15,12 +12,8 @@ export default async function Home({ searchParams }: SearchPageProps) {
   const onlineOnly = online === "1";
   const stats = await getStats();
 
-  // primera visita: sembrar hubs y correr un lote (comportamiento documentado)
-  if (stats.sites === 0) {
-    const t = getTransport();
-    await runPipeline({ maxPages: 20, maxRetries: 1 });
-    if (t.mode === "sim") await healthSweep(t, { limit: 20 });
-  }
+  // SEC-03: la página pública SOLO observa. El crawl/health los ejecuta el
+  // worker (WORKER_INTERVAL_SECONDS) o una acción administrativa explícita.
 
   const hits = q.trim() ? await searchPages(q, { onlineOnly, limit: 25 }) : [];
 

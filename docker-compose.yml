@@ -36,10 +36,35 @@ services:
     ports:
       - "3000:3000"   # acceso clearnet local (la interfaz onion sale por tor:9050)
 
-  # aplicar el esquema una sola vez
-  migrate:
+  # Worker persistente (WORK-01): es el ÚNICO proceso que programa las
+  # ejecuciones — seed → crawl → health → sleep → repeat. /ops solo observa
+  # y ordena acciones puntuales. El admin inicial se provisiona aquí en el
+  # primer arranque (SEC-01: compose exige credenciales en producción).
+  worker:
     build: .
-    command: npx drizzle-kit push --force
+    command: node .worker-build/worker/crawler.js
+    depends_on:
+      db:
+        condition: service_healthy
+      tor:
+        condition: service_started
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgres://faro:faro@db:5432/faro
+      CRAWL_MODE: live
+      TOR_SOCKS_PROXY: socks5h://tor:9050
+      WORKER_INTERVAL_SECONDS: "900"
+      WORKER_MAX_PAGES: "60"
+      WORKER_HEALTH_LIMIT: "40"
+      NODE_ENV: production
+      ADMIN_INITIAL_EMAIL: ${ADMIN_INITIAL_EMAIL:?definí ADMIN_INITIAL_EMAIL en el entorno}
+      ADMIN_INITIAL_PASSWORD: ${ADMIN_INITIAL_PASSWORD:?definí ADMIN_INITIAL_PASSWORD en el entorno (≥8, no default)}
+
+  # aplicar el esquema una sola vez (incluye el índice GIN FTS, DB-01)
+  migrate:
+    build:
+      context: .
+      target: migrator
     depends_on:
       db:
         condition: service_healthy

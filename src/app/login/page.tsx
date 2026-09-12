@@ -15,7 +15,12 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
     const h = await headers();
     const ip = h.get("x-forwarded-for")?.split(",")[0]?.trim() ?? null;
     const ua = h.get("user-agent");
-    const res = await attemptLogin(email, password, ip, ua);
+    let res: Awaited<ReturnType<typeof attemptLogin>>;
+    try {
+      res = await attemptLogin(email, password, ip, ua);
+    } catch {
+      redirect("/login?error=bootstrap");
+    }
     if (res.ok) redirect("/ops");
     redirect(`/login?error=${encodeURIComponent(res.error)}`);
   }
@@ -23,6 +28,7 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
   const msg =
     error === "rate_limited" ? "demasiados intentos — esperá 10 minutos"
     : error === "bad_credentials" ? "email o contraseña incorrectos"
+    : error === "bootstrap" ? "falta configurar el admin inicial (ADMIN_INITIAL_EMAIL/PASSWORD)"
     : error ? "error de acceso"
     : "";
 

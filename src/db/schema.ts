@@ -2,6 +2,7 @@
 // Migrado de db/models.py (OnionSite/Blocklist) ampliado para FARO:
 // cola persistente, historial de salud, espejos, sesiones y reportes.
 
+import { sql } from "drizzle-orm";
 import {
   pgTable,
   serial,
@@ -75,6 +76,8 @@ export const pages = pgTable(
     uniqueIndex("pages_url_key").on(t.url),
     index("pages_site_idx").on(t.siteId),
     index("pages_hash_idx").on(t.contentHash),
+    // FTS: la expresión debe coincidir EXACTAMENTE con tsvectorExpr de src/lib/search.ts
+    index("pages_fts_idx").using("gin", sql`to_tsvector('simple', coalesce(title, '') || ' ' || coalesce(description, '') || ' ' || content)`),
   ]
 );
 

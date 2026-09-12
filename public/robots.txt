@@ -1,0 +1,6 @@
+# FARO — buscador .onion
+User-agent: *
+Allow: /
+Disallow: /ops
+Disallow: /login
+Disallow: /api/

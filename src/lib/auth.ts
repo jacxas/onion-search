@@ -3,11 +3,15 @@
 // admin authorization (sesión o ADMIN_TOKEN server-to-server).
 
 import { cookies } from "next/headers";
-import { createHash, randomBytes, scryptSync, timingSafeEqual } from "node:crypto";
+import { createHash, timingSafeEqual } from "node:crypto";
+import { hashPassword, verifyPassword } from "./password";
+import { ensureInitialAdmin } from "./admin-bootstrap";
+export { hashPassword, verifyPassword } from "./password";
+export { ensureInitialAdmin } from "./admin-bootstrap";
 import { and, eq, gt, lt, sql } from "drizzle-orm";
 import { db } from "../db";
 import { adminUsers, loginAttempts, sessions } from "../db/schema";
-import { getConfig } from "./config";
+import { getConfig, validateAdminBootstrap } from "./config";
 import { randomToken, sha256Hex } from "./onion";
 
 const COOKIE = "faro_session";
@@ -15,21 +19,6 @@ const SESSION_DAYS = 7;
 const RATE_WINDOW_MIN = 10;
 const RATE_MAX = 6;
 
-// ── scrypt ─────────────────────────────────────────────────────────────────
-
-export function hashPassword(password: string): string {
-  const salt = randomBytes(16).toString("hex");
-  const hash = scryptSync(password, salt, 64).toString("hex");
-  return `scrypt:${salt}:${hash}`;
-}
-
-export function verifyPassword(password: string, stored: string): boolean {
-  const [scheme, salt, hash] = stored.split(":");
-  if (scheme !== "scrypt" || !salt || !hash) return false;
-  const expect = Buffer.from(hash, "hex");
-  const got = scryptSync(password, salt, expect.length);
-  return expect.length === got.length && timingSafeEqual(expect, got);
-}
 
 // ── sesiones ────────────────────────────────────────────────────────────────
 
@@ -38,16 +27,6 @@ export interface SessionUser {
   email: string;
 }
 
-/** Crea admin inicial desde config si la tabla está vacía (idempotente). */
-export async function ensureInitialAdmin(): Promise<void> {
-  const cfg = getConfig();
-  const d = db();
-  const res = await d.select({ n: sql<number>`count(*)::int` }).from(adminUsers);
-  if (Number(res[0]?.n ?? 0) === 0) {
-    await d.insert(adminUsers).values({ email: cfg.adminInitialEmail, passwordHash: hashPassword(cfg.adminInitialPassword) })
-      .onConflictDoNothing();
-  }
-}
 
 export async function createSession(userId: number, ip: string | null, userAgent: string | null): Promise<void> {
   const token = randomToken(32);

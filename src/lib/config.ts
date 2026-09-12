@@ -19,12 +19,13 @@ export interface MeiliConfig {
 }
 
 export interface AppConfig {
+  isProduction: boolean;
   databaseUrl: string | null;
   crawlMode: CrawlMode;
   torSocksProxy: string;
   torSeedUrls: string[];
   adminInitialEmail: string;
-  adminInitialPassword: string;
+  adminInitialPassword: string | null;
   adminToken: string | null;
   csrfEnabled: boolean;
   secureCookies: boolean;
@@ -67,6 +68,36 @@ function parseProxy(): string {
   return `socks5h://${host}:${port}`;
 }
 
+// Contraseñas conocidas/default que jamás pueden usarse como credencial
+// inicial de admin en producción (SEC-01).
+const KNOWN_DEFAULT_PASSWORDS = new Set([
+  "faro-admin-123", "admin", "password", "changeme", "12345678", "admin123",
+]);
+
+/**
+ * Valida las credenciales del bootstrap inicial de admin (SEC-01).
+ * En producción son obligatorias y no pueden ser conocidas/default;
+ * en desarrollo se mantiene el comportamiento cómodo con defaults.
+ * Solo aplica al PRIMER arranque (tabla admin_users vacía): después
+ * la autenticación vive en la DB (hash scrypt) y no depende del entorno.
+ */
+export function validateAdminBootstrap(
+  email: string | null,
+  password: string | null
+): { ok: true } | { ok: false; error: string } {
+  if (process.env.NODE_ENV !== "production") return { ok: true };
+  if (!email || !password) {
+    return { ok: false, error: "producción sin ADMIN_INITIAL_EMAIL/ADMIN_INITIAL_PASSWORD — definirlos antes del primer arranque" };
+  }
+  if (password.length < 8) {
+    return { ok: false, error: "ADMIN_INITIAL_PASSWORD debe tener al menos 8 caracteres" };
+  }
+  if (KNOWN_DEFAULT_PASSWORDS.has(password)) {
+    return { ok: false, error: "ADMIN_INITIAL_PASSWORD es una contraseña conocida — definir una contraseña real" };
+  }
+  return { ok: true };
+}
+
 let cached: AppConfig | null = null;
 
 /** Config parseada y cacheada. `force` re-lee (tests). */
@@ -74,18 +105,24 @@ export function getConfig(force = false): AppConfig {
   if (cached && !force) return cached;
 
   const mode = process.env.CRAWL_MODE === "live" ? "live" : "sim";
+  const isProduction = process.env.NODE_ENV === "production";
 
   const mailUser = process.env.MAIL_USERNAME;
   const mailPass = process.env.MAIL_PASSWORD;
   const mailTo = process.env.MAIL_ALERT_TO;
 
   cached = {
+    isProduction,
     databaseUrl: process.env.DATABASE_URL || null,
     crawlMode: mode,
     torSocksProxy: parseProxy(),
     torSeedUrls: parseSeeds(process.env.TOR_SEED_URLS),
+    // En desarrollo: defaults cómodos. En producción: obligatorio por env
+    // (validado en el bootstrap, sin fallback de contraseña conocida).
     adminInitialEmail: process.env.ADMIN_INITIAL_EMAIL || "admin@faro.local",
-    adminInitialPassword: process.env.ADMIN_INITIAL_PASSWORD || "faro-admin-123",
+    adminInitialPassword: isProduction
+      ? process.env.ADMIN_INITIAL_PASSWORD || null
+      : process.env.ADMIN_INITIAL_PASSWORD || "faro-admin-123",
     adminToken: process.env.ADMIN_TOKEN || null,
     csrfEnabled: bool(process.env.CSRF_ENABLED, true),
     secureCookies: bool(process.env.SECURE_COOKIES, false),
