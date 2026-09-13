@@ -160,7 +160,7 @@ fi
 
 echo "===== GATE 10 — red interna ====="
 APPDB=$($CMP exec -T app node -e "require('net').createConnection(5432,'db').on('connect',()=>{console.log('ok');process.exit(0)}).on('error',()=>process.exit(1))" 2>/dev/null | grep -c ok || true)
-WKTOR=$($CMP exec -T worker node -e "require('net').createConnection(9050,'tor').on('connect',()=>{console.log('ok');process.exit(0)}).on('error',()=>process.exit(1))" 2>/dev/null | grep -c ok || true)
+WKTOR=$($CMP run --rm --entrypoint node worker -e "require('net').createConnection(9050,'tor').on('connect',()=>{console.log('ok');process.exit(0)}).on('error',()=>process.exit(1))" 2>/dev/null | grep -c ok || true)
 MIGTOR=$($CMP run --rm --entrypoint sh migrate -c "nc -z db 5432 && echo ok" 2>/dev/null | grep -c ok || true)
 if [ "${APPDB:-0}" -ge 1 ] && [ "${WKTOR:-0}" -ge 1 ] && [ "${MIGTOR:-0}" -ge 1 ]; then
   gate 10 "Red interna" 0 "app→db:5432 ✓ worker→tor:9050 ✓ migrate→db:5432 ✓ · tor no publicado al host"
