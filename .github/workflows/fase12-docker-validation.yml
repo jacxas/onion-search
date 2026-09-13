@@ -1,0 +1,22 @@
+# FARO — FASE 12: validación REAL de Docker/Compose en runner Linux.
+# Este workflow es un harness de validación: NO modifica código de la app.
+# Se dispara al push en faro/build y ejecuta los 13 gates de la fase.
+name: FASE 12 — Validación Docker/Compose
+
+on:
+  push:
+    branches: [faro/build]
+  workflow_dispatch:
+
+env:
+  ADMIN_INITIAL_EMAIL: ci-admin@faro.local
+  ADMIN_INITIAL_PASSWORD: ci-clave-fase12-456
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+      - name: Ejecutar gates FASE 12
+        run: bash .github/workflows/fase12-gates.sh
