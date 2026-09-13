@@ -23,6 +23,17 @@ COPY --from=builder /app/drizzle.config.ts ./
 # drizzle.config.ts lee DATABASE_URL del entorno (sin URLs hardcodeadas)
 ENTRYPOINT ["npx", "drizzle-kit", "push", "--force"]
 
+
+# Worker: mismo build del crawler con sus node_modules de runtime. El standalone
+# de Next NO incluye las dependencias externas del worker (pg/drizzle/cheerio/
+# fetch-socks) — el worker necesita imagen propia para ejecutarse.
+FROM node:22-alpine AS worker
+WORKDIR /app
+ENV NODE_ENV=production
+COPY --from=deps /app/node_modules ./node_modules
+COPY --from=builder /app/.worker-build ./.worker-build
+CMD ["node", ".worker-build/worker/crawler.js"]
+
 FROM node:22-alpine AS runner
 WORKDIR /app
 ENV NODE_ENV=production NEXT_TELEMETRY_DISABLED=1

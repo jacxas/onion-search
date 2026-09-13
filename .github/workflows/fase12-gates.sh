@@ -23,7 +23,6 @@ services:
     environment:
       CRAWL_MODE: sim
   worker:
-    image: faro:phase12
     environment:
       CRAWL_MODE: sim
       WORKER_INTERVAL_SECONDS: "20"
@@ -77,16 +76,14 @@ else
   gate 4 "Migration" 1 "rc=$MIGRC tablas=${TB:-?} FKs=${FK:-?} GIN=${GIN:-?} $(tail -2 /tmp/migrate.log | tr '\n' ' ')"
 fi
 
-echo "===== GATE 6 — app (/, /login, /ops, login) ====="
+echo "===== GATE 6a — app páginas públicas (worker abajo) ====="
 C_ROOT=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:3000/)
 C_LOGIN=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:3000/login)
 C_OPS=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:3000/ops)
-AID=$(curl -s http://localhost:3000/login | grep -o '\$ACTION_ID_[a-f0-9]*' | head -1)
-LOC=$(curl -s -X POST http://localhost:3000/login -F "email=$ADMIN_INITIAL_EMAIL" -F "password=$ADMIN_INITIAL_PASSWORD" -F "$AID=" -D - -o /dev/null | grep -i "^location" | tr -d '\r' | tail -1)
-if [ "$C_ROOT" = "200" ] && [ "$C_LOGIN" = "200" ] && [ "$C_OPS" = "307" ] && echo "$LOC" | grep -q "/ops"; then
-  gate 6 "App" 0 "/ 200 · /login 200 · /ops 307 · POST login → $LOC"
+if [ "$C_ROOT" = "200" ] && [ "$C_LOGIN" = "200" ] && [ "$C_OPS" = "307" ]; then
+  gate 6a "App (públicas)" 0 "/ 200 · /login 200 · /ops 307 sin sesión"
 else
-  gate 6 "App" 1 "/=$C_ROOT /login=$C_LOGIN /ops=$C_OPS login='$LOC'"
+  gate 6a "App (públicas)" 1 "/=$C_ROOT /login=$C_LOGIN /ops=$C_OPS"
 fi
 
 echo "===== GATE 7 — NO autorun desde / ====="
@@ -113,15 +110,25 @@ else
   gate 5 "First boot admin" 1 "admin_users=${ADM:-?} leaks=${LEAK:-?}"
 fi
 
+echo "===== GATE 6b — login (admin ya provisionado) ====="
+AID=$(curl -s http://localhost:3000/login | grep -o '\$ACTION_ID_[a-f0-9]*' | head -1)
+LOC=$(curl -s -X POST http://localhost:3000/login -F "email=$ADMIN_INITIAL_EMAIL" -F "password=$ADMIN_INITIAL_PASSWORD" -F "$AID=" -D - -o /dev/null | grep -i "^location" | tr -d '\r' | tail -1)
+if echo "$LOC" | grep -q "/ops"; then
+  gate 6b "Login" 0 "POST login → $LOC"
+else
+  gate 6b "Login" 1 "login='$LOC'"
+fi
+
 echo "===== GATE 8 — worker independiente + scheduler + SIGTERM ====="
-sleep 75  # intervalo 20s → varios ciclos sin ninguna petición HTTP a /
+sleep 115  # ciclo completo (crawl+health) ~110s + duerme 20s → scheduler probado
 CYC=$($CMP logs worker 2>/dev/null | grep -c "pipeline de rastreo" || true)
 SLP=$($CMP logs worker 2>/dev/null | grep -c "duerme" || true)
+GRACEP=$($CMP logs worker 2>/dev/null | grep -c "salud" || true)
 $CMP stop -t 25 worker > /dev/null 2>&1
 GRACE=$($CMP logs worker 2>/dev/null | grep -c "shutdown limpio" || true)
 $CMP up -d worker >> /tmp/boot.log 2>&1 || true
-if [ "${CYC:-0}" -ge 2 ] && [ "${GRACE:-0}" -ge 1 ]; then
-  gate 8 "Worker + scheduler + SIGTERM" 0 "ciclos=$CYC sleeps=$SLP · SIGTERM → shutdown limpio ($GRACE) · reiniciado"
+if [ "${CYC:-0}" -ge 1 ] && [ "${SLP:-0}" -ge 1 ] && [ "${GRACE:-0}" -ge 1 ]; then
+  gate 8 "Worker + scheduler + SIGTERM" 0 "ciclos=$CYC sleeps=$SLP barridos=$GRACEP · SIGTERM → shutdown limpio ($GRACE) · reiniciado"
 else
   gate 8 "Worker + scheduler + SIGTERM" 1 "ciclos=${CYC:-?} shutdown_limpio=${GRACE:-?}"
 fi

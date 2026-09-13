@@ -45,8 +45,7 @@ services:
   worker:
     build:
       context: .
-      target: runner
-    command: node .worker-build/worker/crawler.js
+      target: worker
     depends_on:
       db:
         condition: service_healthy
