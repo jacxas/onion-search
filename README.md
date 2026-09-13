@@ -99,3 +99,7 @@ health sweep, así el índice se puebla solo.
   «solo en línea» los excluye.
 - `ADMIN_TOKEN` protege `/api/admin/run` en producción.
 - Revisá la legislación de tu jurisdicción antes de rastrear la dark web.
+
+---
+
+Última actualización: 2026-09-13
