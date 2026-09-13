@@ -21,7 +21,9 @@ services:
     restart: unless-stopped
 
   app:
-    build: .
+    build:
+      context: .
+      target: runner
     depends_on:
       db:
         condition: service_healthy
@@ -41,7 +43,9 @@ services:
   # y ordena acciones puntuales. El admin inicial se provisiona aquí en el
   # primer arranque (SEC-01: compose exige credenciales en producción).
   worker:
-    build: .
+    build:
+      context: .
+      target: runner
     command: node .worker-build/worker/crawler.js
     depends_on:
       db:

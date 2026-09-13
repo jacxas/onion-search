@@ -14,6 +14,15 @@ RUN npm run build
 # worker: crawler + health scheduler (proceso separado, WORK-01)
 RUN npx tsc -p tsconfig.worker.json
 
+# Migración: mismo contexto, imagen con herramientas de schema (DEP-02/DB-01)
+FROM node:22-alpine AS migrator
+WORKDIR /app
+COPY --from=deps /app/node_modules ./node_modules
+COPY --from=builder /app/src ./src
+COPY --from=builder /app/drizzle.config.ts ./
+# drizzle.config.ts lee DATABASE_URL del entorno (sin URLs hardcodeadas)
+ENTRYPOINT ["npx", "drizzle-kit", "push", "--force"]
+
 FROM node:22-alpine AS runner
 WORKDIR /app
 ENV NODE_ENV=production NEXT_TELEMETRY_DISABLED=1
@@ -37,12 +46,3 @@ ENV PORT=3000
 #                      para el primer arranque; luego la auth vive en la DB)
 #   WORKER_INTERVAL_SECONDS  ciclo del worker (sin ella = one-shot)
 CMD ["node", "server.js"]
-
-# Migración: mismo contexto, imagen con herramientas de schema (DEP-02/DB-01)
-FROM node:22-alpine AS migrator
-WORKDIR /app
-COPY --from=deps /app/node_modules ./node_modules
-COPY --from=builder /app/src ./src
-COPY --from=builder /app/drizzle.config.ts ./
-# drizzle.config.ts lee DATABASE_URL del entorno (sin URLs hardcodeadas)
-ENTRYPOINT ["npx", "drizzle-kit", "push", "--force"]

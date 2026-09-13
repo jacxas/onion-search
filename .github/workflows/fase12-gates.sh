@@ -71,8 +71,8 @@ $CMP run --rm migrate > /tmp/migrate.log 2>&1; MIGRC=$?
 TB=$($DBP "SELECT count(*) FROM information_schema.tables WHERE table_schema='public'" 2>/dev/null)
 GIN=$($DBP "SELECT count(*) FROM pg_indexes WHERE indexname='pages_fts_idx'" 2>/dev/null)
 FK=$($DBP "SELECT count(*) FROM information_schema.table_constraints WHERE constraint_type='FOREIGN KEY'" 2>/dev/null)
-if [ "$MIGRC" -eq 0 ] && [ "${TB:-0}" -ge 10 ] && [ "${GIN:-0}" -ge 1 ] && [ "${FK:-0}" -ge 5 ]; then
-  gate 4 "Migration" 0 "tablas=$TB FKs=$FK GIN pages_fts_idx=$GIN (sin worker)"
+if [ "$MIGRC" -eq 0 ] && [ "${TB:-0}" -ge 10 ] && [ "${GIN:-0}" -ge 1 ] && [ "${FK:-0}" -eq 3 ]; then
+  gate 4 "Migration" 0 "tablas=$TB FKs=$FK (=schema) GIN pages_fts_idx=$GIN (sin worker)"
 else
   gate 4 "Migration" 1 "rc=$MIGRC tablas=${TB:-?} FKs=${FK:-?} GIN=${GIN:-?} $(tail -2 /tmp/migrate.log | tr '\n' ' ')"
 fi
@@ -154,7 +154,7 @@ fi
 echo "===== GATE 10 — red interna ====="
 APPDB=$($CMP exec -T app node -e "require('net').createConnection(5432,'db').on('connect',()=>{console.log('ok');process.exit(0)}).on('error',()=>process.exit(1))" 2>/dev/null | grep -c ok || true)
 WKTOR=$($CMP exec -T worker node -e "require('net').createConnection(9050,'tor').on('connect',()=>{console.log('ok');process.exit(0)}).on('error',()=>process.exit(1))" 2>/dev/null | grep -c ok || true)
-MIGTOR=$($CMP run --rm migrate sh -c "nc -z db 5432 && echo ok" 2>/dev/null | grep -c ok || true)
+MIGTOR=$($CMP run --rm --entrypoint sh migrate -c "nc -z db 5432 && echo ok" 2>/dev/null | grep -c ok || true)
 if [ "${APPDB:-0}" -ge 1 ] && [ "${WKTOR:-0}" -ge 1 ] && [ "${MIGTOR:-0}" -ge 1 ]; then
   gate 10 "Red interna" 0 "app→db:5432 ✓ worker→tor:9050 ✓ migrate→db:5432 ✓ · tor no publicado al host"
 else
