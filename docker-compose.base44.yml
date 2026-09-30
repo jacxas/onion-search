@@ -1,0 +1,63 @@
+# Base44 dev environment for FARO (Python FastAPI backend).
+# Runs the app from the cloned source with live reload on port 3000.
+services:
+  db:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: faro
+      POSTGRES_PASSWORD: faro
+      POSTGRES_DB: faro
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U faro -d faro"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    restart: on-failure
+
+  meili:
+    image: getmeili/meilisearch:v1.12
+    environment:
+      MEILI_MASTER_KEY: dev-master-key
+      MEILI_ENV: development
+    volumes:
+      - meilidata:/meili_data
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:7700/health || exit 1"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    restart: on-failure
+
+  app:
+    image: python:3.11-slim
+    working_dir: /app
+    volumes:
+      - ./:/app
+    command: >
+      sh -ec "pip install --no-cache-dir -r requirements.txt 'fastapi==0.109.2' &&
+      exec uvicorn backend.main:app --host 0.0.0.0 --port 3000 --reload"
+    environment:
+      DATABASE_URL: postgresql+psycopg2://faro:faro@db:5432/faro
+      MEILI_URL: http://meili:7700
+      MEILI_MASTER_KEY: dev-master-key
+      ADMIN_TOKEN: admin-secret-token
+    ports:
+      - "3000:3000"
+    depends_on:
+      db:
+        condition: service_healthy
+      meili:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:3000/health').read()\""]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    restart: on-failure
+
+volumes:
+  pgdata:
+  meilidata:
