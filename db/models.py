@@ -37,6 +37,10 @@ class OnionSite(Base):
     
     is_blocked = Column(Boolean, default=False)
     block_reason = Column(String(255), nullable=True)
+
+    category = Column(String(64), nullable=True, index=True)
+    language = Column(String(8), default='es')
+    is_mirror = Column(Boolean, default=False)
     
     __table_args__ = (
         Index('idx_online', 'online'),
@@ -81,3 +85,35 @@ class Blocklist(Base):
     
     def __repr__(self):
         return f"<Blocklist(url='{self.url[:50]}...', reason='{self.reason}')>"
+
+
+class SiteReport(Base):
+    """
+    Reporte enviado por un usuario sobre un sitio del índice.
+    """
+    __tablename__ = 'site_reports'
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    site_id = Column(Integer, nullable=True, index=True)
+    url = Column(String(255), nullable=False)
+    reason = Column(String(64), nullable=False, default='otro')
+    details = Column(Text, nullable=True)
+    status = Column(String(16), nullable=False, default='pendiente')
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+
+    def __repr__(self):
+        return f"<SiteReport(url='{self.url[:40]}...', reason='{self.reason}')>"
+
+
+class SiteCheck(Base):
+    """
+    Historial de chequeos de salud de un sitio (últimos N en la ficha).
+    """
+    __tablename__ = 'site_checks'
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    site_id = Column(Integer, nullable=False, index=True)
+    checked_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    online = Column(Boolean, default=False)
+    response_time = Column(Float, nullable=True)
+    status_code = Column(Integer, default=0)

@@ -1,228 +1,256 @@
-<!DOCTYPE html>
-<html lang="es">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Onion Search</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <style>
-    * { box-sizing: border-box; margin: 0; padding: 0; }
-    body {
-      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
-      background: linear-gradient(135deg, #0f0f1a 0%, #1a1a2e 100%);
-      color: #e8e8ed;
-      min-height: 100vh;
-      padding: 2rem;
-    }
-    .container { max-width: 900px; margin: 0 auto; }
-    
-    header {
-      text-align: center;
-      margin-bottom: 3rem;
-    }
-    
-    h1 {
-      font-size: 2.5rem;
-      font-weight: 700;
-      background: linear-gradient(90deg, #00d9ff, #7b2cbf);
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
-      margin-bottom: 0.5rem;
-    }
-    
-    .tagline {
-      color: #8888a0;
-      font-size: 1.1rem;
-    }
-    
-    .search-box {
-      display: flex;
-      gap: 0.75rem;
-      margin-bottom: 2rem;
-      background: rgba(255,255,255,0.05);
-      padding: 0.5rem;
-      border-radius: 12px;
-      border: 1px solid rgba(255,255,255,0.1);
-    }
-    
-    input[type="text"] {
-      flex: 1;
-      padding: 1rem 1.25rem;
-      font-size: 1rem;
-      border: none;
-      border-radius: 8px;
-      background: rgba(15,15,30,0.8);
-      color: #fff;
-      outline: none;
-    }
-    
-    input[type="text"]:focus {
-      box-shadow: 0 0 0 2px #00d9ff;
-    }
-    
-    button {
-      padding: 1rem 2rem;
-      font-size: 1rem;
-      background: linear-gradient(90deg, #00d9ff, #0099cc);
-      color: #0f0f1a;
-      border: none;
-      border-radius: 8px;
-      cursor: pointer;
-      font-weight: 600;
-      transition: transform 0.2s;
-    }
-    
-    button:hover {
-      transform: translateY(-2px);
-    }
-    
-    .results { list-style: none; }
-    
-    .result {
-      background: rgba(255,255,255,0.03);
-      padding: 1.5rem;
-      margin-bottom: 1rem;
-      border-radius: 12px;
-      border-left: 4px solid #00d9ff;
-      transition: transform 0.2s, box-shadow 0.2s;
-    }
-    
-    .result:hover {
-      transform: translateX(4px);
-      box-shadow: 0 4px 20px rgba(0,217,255,0.1);
-    }
-    
-    .result h3 a {
-      color: #00d9ff;
-      text-decoration: none;
-      font-size: 1.2rem;
-      font-weight: 600;
-    }
-    
-    .result h3 a:hover {
-      text-decoration: underline;
-    }
-    
-    .result .url {
-      font-size: 0.85rem;
-      color: #666680;
-      margin: 0.5rem 0;
-      word-break: break-all;
-    }
-    
-    .result .description {
-      color: #c8c8d8;
-      line-height: 1.6;
-    }
-    
-    .result .meta {
-      margin-top: 1rem;
-      font-size: 0.8rem;
-      display: flex;
-      gap: 1rem;
-      align-items: center;
-    }
-    
-    .badge {
-      padding: 0.25rem 0.75rem;
-      border-radius: 20px;
-      font-weight: 600;
-      font-size: 0.75rem;
-    }
-    
-    .badge.online {
-      background: rgba(74,222,128,0.15);
-      color: #4ade80;
-    }
-    
-    .badge.offline {
-      background: rgba(248,113,113,0.15);
-      color: #f87171;
-    }
-    
-    .empty {
-      text-align: center;
-      color: #8888a0;
-      padding: 4rem 2rem;
-      background: rgba(255,255,255,0.02);
-      border-radius: 12px;
-    }
-    
-    footer {
-      text-align: center;
-      margin-top: 3rem;
-      color: #666680;
-      font-size: 0.85rem;
-    }
-    
-    footer a {
-      color: #00d9ff;
-      text-decoration: none;
-    }
-  </style>
-</head>
-<body>
-  <div class="container">
-    <header>
-      <h1>🧅 Onion Search</h1>
-      <p class="tagline">Buscador anÃ³nimo para la red Tor con verificaciÃ³n de uptime</p>
-    </header>
-    
-    <form action="/search" method="get" class="search-box">
-      <input 
-        type="text" 
-        name="q" 
-        value="{{ query }}" 
-        placeholder="Buscar en la red Tor..."
-        autofocus
-      >
-      <button type="submit">Buscar</button>
-    </form>
-    
-    {% if results %}
-      <ul class="results">
-        {% for result in results %}
-        <li class="result">
-          <h3>
-            <a href="{{ result.url }}" target="_blank" rel="noopener">{{ result.title }}</a>
-          </h3>
-          <div class="url">{{ result.url }}</div>
-          {% if result.description %}
-          <div class="description">{{ result.description }}</div>
-          {% endif %}
-          <div class="meta">
-            <span class="badge {% if result.online %}online{% else %}offline{% endif %}">
-              {% if result.online %}✓ Online{% else %}✗ Offline{% endif %}
-            </span>
-            <span>Uptime: {{ (result.uptime_ratio * 100)|round|int }}%</span>
-            {% if result.last_checked %}
-            <span>Verificado: {{ result.last_checked.strftime('%Y-%m-%d %H:%M') }}</span>
-            {% endif %}
-          </div>
-        </li>
-        {% endfor %}
-      </ul>
-    
-    {% elif query %}
-      <div class="empty">
-        <p>No se encontraron resultados para "<strong>{{ query }}</strong>"</p>
+{% extends "base.html" %}
+{% block title %}{% if searcher and query %}{{ query }} · FARO{% else %}FARO · buscador de servicios onion{% endif %}{% endblock %}
+
+{% macro uptime(site) -%}
+<span class="uptime">
+  <span class="uptime-bar"><span style="width: {{ (site.uptime_ratio * 100)|round|int }}%"></span></span>
+  {{ (site.uptime_ratio * 100)|round|int }}%
+</span>
+{%- endmacro %}
+
+{% macro result_card(r) -%}
+<a class="result" href="/sitio/{{ r.domain }}">
+  <h3>{{ r.title }}</h3>
+  <div class="url">{{ r.domain }}</div>
+  {% if r.description %}<p class="desc">{{ r.description }}</p>{% endif %}
+  <div class="meta">
+    <span class="badge {{ 'online' if r.online else 'offline' }}">
+      <span class="{{ 'dot-up' if r.online else 'dot-down' }}"></span>
+      {{ 'en línea' if r.online else 'caído' }}
+    </span>
+    {% if r.category %}<span class="badge cat">{{ r.category }}</span>{% endif %}
+    {% if r.is_mirror %}<span class="badge mirror">espejo</span>{% endif %}
+    <span>{{ uptime(r) }}</span>
+    {% if r.avg_response_time %}<span>{{ '%.2f'|format(r.avg_response_time) }} s</span>{% endif %}
+    <span>verificado {{ r.last_checked|timeago }}</span>
+  </div>
+</a>
+{%- endmacro %}
+
+{% block content %}
+<div class="wrap">
+
+  {% if not searcher %}
+  <section class="hero">
+    <h1>Encontrá lo que la red<br><em>todavía alumbra</em></h1>
+    <p class="lede">
+      FARO indexa servicios <span class="mono">.onion</span> y verifica su salud de forma
+      continua. Antes de abrir un nodo, mirá cuándo respondió por última vez.
+    </p>
+
+    <form class="search-shell" action="/search" method="get" role="search">
+      <div class="search-row">
+        <div class="search-input-wrap">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+            <circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5" stroke-linecap="round"/>
+          </svg>
+          <input class="search-input" type="search" name="q" placeholder="Bibliotecas, foros, correo cifrado…" autofocus autocomplete="off">
+        </div>
+        <button class="btn btn-primary" type="submit">Encender faro</button>
       </div>
-    
-    {% else %}
-      <div class="empty">
-        <p>BuscÃ¡ en la red Tor de forma anÃ³nima y segura.</p>
-        <p style="margin-top: 1rem; font-size: 0.9rem;">
-          Este motor indexa sitios .onion verificados con tracking de uptime en tiempo real.
+      <div class="search-chips">
+        <span class="label">Atajos</span>
+        {% for term in ['biblioteca', 'foro', 'correo', 'herramientas', 'noticias'] %}
+        <a class="chip" href="/search?q={{ term }}">{{ term|capitalize }}</a>
+        {% endfor %}
+        <a class="chip" href="/azar" title="Nodo en línea al azar">al azar ↗</a>
+      </div>
+    </form>
+
+    <div class="stats-strip">
+      <div class="stat"><div class="k">nodos indexados</div><div class="v">{{ stats.total }}</div></div>
+      <div class="stat"><div class="k">en línea ahora</div><div class="v" style="color:var(--up)">{{ stats.online }}</div></div>
+      <div class="stat"><div class="k">uptime medio</div><div class="v">{{ stats.avg_uptime }}<small>%</small></div></div>
+      <div class="stat"><div class="k">latencia media</div><div class="v">{{ '%.2f'|format(stats.avg_latency) if stats.avg_latency else '—' }}<small> s</small></div></div>
+      <div class="stat"><div class="k">último barrido</div><div class="v" style="font-size:1.05rem;padding-top:6px">{{ stats.last_check|timeago }}</div></div>
+    </div>
+  </section>
+
+  {% if destacados %}
+  <section class="section">
+    <div class="section-head">
+      <h2>Nodos mejor señalados</h2>
+      <span class="hint">ordenados por disponibilidad verificada</span>
+    </div>
+    <div class="result-list">
+      {% for r in destacados %}{{ result_card(r) }}{% endfor %}
+    </div>
+  </section>
+  {% endif %}
+
+  <div class="layout">
+    <section class="section" style="margin-top:0">
+      <div class="section-head">
+        <h2>Explorar por categoría</h2>
+        <a class="hint" href="/directorio">ver directorio completo →</a>
+      </div>
+      <div class="cards-2">
+        {% for c in categories[:4] %}
+        <a class="card" href="/search?category={{ c.name|urlencode }}" style="color:inherit">
+          <div class="spread">
+            <strong style="color:#fff">{{ c.name }}</strong>
+            <span class="mono muted">{{ c.count }}</span>
+          </div>
+          <p class="small muted" style="margin:8px 0 0">
+            {{ c.count }} nodo{{ '' if c.count == 1 else 's' }} con verificación de uptime.
+          </p>
+        </a>
+        {% endfor %}
+      </div>
+    </section>
+
+    <aside class="side">
+      <div class="panel">
+        <h3>Categorías</h3>
+        <ul>
+          {% for c in categories %}
+          <li><a class="cat-link" href="/search?category={{ c.name|urlencode }}">{{ c.name }}<span class="n">{{ c.count }}</span></a></li>
+          {% endfor %}
+        </ul>
+      </div>
+      <div class="panel">
+        <h3>Últimas verificaciones</h3>
+        <ul class="mini-list">
+          {% for r in recientes %}
+          <li>
+            <span class="t">{{ r.title }}<small>{{ r.domain[:18] }}…</small></span>
+            <span class="badge {{ 'online' if r.online else 'offline' }}">{{ 'ok' if r.online else 'caído' }}</span>
+          </li>
+          {% endfor %}
+        </ul>
+      </div>
+      <div class="panel">
+        <h3>Cómo leer el índice</h3>
+        <p class="small muted" style="margin:0 0 10px">
+          El uptime sale de los últimos 100 chequeos. Un nodo con menos de 60 %
+          suele estar intermitente: reintentá más tarde.
+        </p>
+        <a class="btn btn-ghost btn-sm" href="/estado">Ver estado de la red</a>
+      </div>
+    </aside>
+  </div>
+
+  {% else %}
+  {# ---------- Resultados ---------- #}
+  <div style="padding-top:34px">
+    <div class="crumbs"><a href="/">FARO</a> / búsqueda</div>
+    <div class="spread" style="margin-bottom:16px">
+      <div>
+        <h1 style="font-size:1.6rem;margin:0">
+          {% if query %}«{{ query }}»{% else %}Todo el índice{% endif %}
+        </h1>
+        <p class="small muted" style="margin:6px 0 0">
+          {{ total }} resultado{{ '' if total == 1 else 's' }}
+          · motor {{ 'Meilisearch' if engine == 'meilisearch' else 'local' }}
+          · {{ elapsed_ms }} ms
         </p>
       </div>
-    {% endif %}
-    
-    <footer>
-      <p>Onion Search Engine v1.0 | 
-        <a href="/admin/login">Admin</a>
-      </p>
-    </footer>
+      <form class="search-row" action="/search" method="get" role="search" style="min-width:280px">
+        <div class="search-input-wrap">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+            <circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5" stroke-linecap="round"/>
+          </svg>
+          <input class="search-input" type="search" name="q" value="{{ query }}" placeholder="Buscar de nuevo…" style="padding-top:10px;padding-bottom:10px">
+        </div>
+        <button class="btn btn-primary" type="submit">Buscar</button>
+      </form>
+    </div>
+
+    <div class="layout">
+      <div>
+        <form class="filters" action="/search" method="get" id="filtros">
+          <input type="hidden" name="q" value="{{ query }}">
+          <label class="field mb-0" for="f-cat">Categoría</label>
+          <select class="select" name="category" id="f-cat" onchange="this.form.submit()">
+            <option value="">Todas</option>
+            {% for c in categories %}
+            <option value="{{ c.name }}" {{ 'selected' if filters.category == c.name else '' }}>{{ c.name }} ({{ c.count }})</option>
+            {% endfor %}
+          </select>
+
+          <label class="field mb-0" for="f-status">Estado</label>
+          <select class="select" name="status" id="f-status" onchange="this.form.submit()">
+            {% for value, label in [('todos','Todos'), ('online','En línea'), ('offline','Caídos')] %}
+            <option value="{{ value }}" {{ 'selected' if filters.status == value else '' }}>{{ label }}</option>
+            {% endfor %}
+          </select>
+
+          <label class="field mb-0" for="f-sort">Orden</label>
+          <select class="select" name="sort" id="f-sort" onchange="this.form.submit()">
+            {% for value, label in [('relevancia','Relevancia'), ('uptime','Uptime'), ('latencia','Latencia'), ('reciente','Más reciente')] %}
+            <option value="{{ value }}" {{ 'selected' if filters.sort == value else '' }}>{{ label }}</option>
+            {% endfor %}
+          </select>
+          <noscript><button class="btn btn-ghost btn-sm" type="submit">Aplicar</button></noscript>
+          {% if query or filters.category or filters.status != 'todos' or filters.sort != 'relevancia' %}
+          <a class="btn btn-ghost btn-sm" href="/search">Limpiar</a>
+          {% endif %}
+        </form>
+
+        {% if results %}
+        <div class="result-list">
+          {% for r in results %}{{ result_card(r) }}{% endfor %}
+        </div>
+
+        {% if pages > 1 %}
+        <nav class="pager" aria-label="Paginación">
+          {% set baseq = '?q=' ~ (query|urlencode) ~ '&category=' ~ (filters.category|urlencode) ~ '&status=' ~ filters.status ~ '&sort=' ~ filters.sort %}
+          {% if page > 1 %}
+          <a href="/search{{ baseq }}&page={{ page - 1 }}">← Anterior</a>
+          {% else %}<span class="disabled">← Anterior</span>{% endif %}
+          <span class="current">página {{ page }} de {{ pages }}</span>
+          {% if page < pages %}
+          <a href="/search{{ baseq }}&page={{ page + 1 }}">Siguiente →</a>
+          {% else %}<span class="disabled">Siguiente →</span>{% endif %}
+        </nav>
+        {% endif %}
+
+        {% else %}
+        <div class="empty">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
+            <circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5" stroke-linecap="round"/>
+          </svg>
+          <h3>Sin señal para esa búsqueda</h3>
+          <p>Probá con menos palabras, otra categoría o revisá el <a href="/directorio">directorio</a>.</p>
+        </div>
+        {% endif %}
+      </div>
+
+      <aside class="side">
+        <div class="panel">
+          <h3>Categorías</h3>
+          <ul>
+            <li><a class="cat-link {{ 'active' if not filters.category else '' }}" href="/search?q={{ query|urlencode }}&status={{ filters.status }}&sort={{ filters.sort }}">Todas <span class="n">{{ stats.total }}</span></a></li>
+            {% for c in categories %}
+            <li>
+              <a class="cat-link {{ 'active' if filters.category == c.name else '' }}"
+                 href="/search?q={{ query|urlencode }}&category={{ c.name|urlencode }}&status={{ filters.status }}&sort={{ filters.sort }}">
+                {{ c.name }}<span class="n">{{ c.count }}</span>
+              </a>
+            </li>
+            {% endfor %}
+          </ul>
+        </div>
+        <div class="panel">
+          <h3>Red</h3>
+          <div class="row" style="justify-content:space-between;font-size:.86rem">
+            <span class="muted">En línea</span><span style="color:var(--up)">{{ stats.online }} / {{ stats.total }}</span>
+          </div>
+          <div class="row" style="justify-content:space-between;font-size:.86rem;margin-top:8px">
+            <span class="muted">Uptime medio</span><span>{{ stats.avg_uptime }}%</span>
+          </div>
+          <div class="row" style="justify-content:space-between;font-size:.86rem;margin-top:8px">
+            <span class="muted">Último barrido</span><span>{{ stats.last_check|timeago }}</span>
+          </div>
+        </div>
+        <div class="panel">
+          <h3>¿Un nodo no aparece?</h3>
+          <p class="small muted" style="margin:0 0 10px">Sugerí una dirección o reportá un espejo falso desde la ficha de cualquier nodo.</p>
+          <a class="btn btn-ghost btn-sm" href="/directorio">Ir al directorio</a>
+        </div>
+      </aside>
+    </div>
   </div>
-</body>
-</html>
+  {% endif %}
+</div>
+{% endblock %}

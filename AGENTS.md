@@ -1,59 +1,65 @@
-# FARO — Base44 dev notes
+# FARO — notas para agentes
 
-## What actually runs here
+## Qué corre acá
 
-This repo contains **two incomplete frontend attempts** plus the real app:
+Un único proceso **FastAPI** (`backend/main.py`) que sirve:
 
-- **Root Next.js project** (`package.json`, `next.config.ts`, `Dockerfile`, `docker-compose.yml`):
-  real config files but **no `src/` directory** — the source the README describes
-  (`src/lib/onion.ts`, `src/db/schema.ts`, …) does not exist. `npm run dev/build`
-  cannot work. Do not try to run it.
-- **`frontend/`**: every file is a placeholder stub
-  (`// Contenido de page.tsx (20.5KB) - …`), including `package.json`. Not runnable.
-- **`backend/` + `db/` + `indexer/` + `crawler/` + `health_checker/` (Python)**:
-  the real, complete application. A **FastAPI** app (`backend/main.py`) serves
-  server-rendered **Jinja2** templates (`backend/templates/*.html`) — the HTML UI
-  is produced by the backend, there is no separate JS frontend. Backed by
-  **PostgreSQL** (SQLAlchemy, `db/`) and **MeiliSearch** (`indexer/`).
+- el portal público renderizado con **Jinja2** (`backend/templates/`),
+- la **API JSON** (`/api/search`, `/api/stats`, `/api/sites`, `/health`),
+- el **centro de mando** en `/admin` (token + cookie).
 
-The Base44 compose runs only the FastAPI app + Postgres + MeiliSearch. The
-crawler/Tor path (`crawler/`, `health_checker/`) needs a live Tor SOCKS proxy and
-real `.onion` seeds; it is **not** started in the preview and is not needed to
-boot or browse the UI.
+Base de datos vía SQLAlchemy (`db/`); **SQLite por defecto** (`./faro.db`, sin
+`DATABASE_URL`) y **PostgreSQL** en Docker. Meilisearch es opcional: si no
+responde, la búsqueda cae a un motor local (ver `backend/search.py`).
 
-## Boot
+El rastreo real (`crawler/`, `health_checker/`) necesita Tor y semillas; **no**
+se ejecuta en el preview. En su lugar corre la semilla demo (`db/seed.py`).
 
-```
-docker compose -f docker-compose.base44.yml up -d --build
+## Arranque
+
+```bash
+bash scripts/start.sh            # :3000, health en /health
 ```
 
-App on host port **3000** (`uvicorn backend.main:app --reload`). Health: `GET /health`.
+`.base44/environment.json` apunta a ese script. `docker compose up -d --build`
+levanta app + Postgres + Meili + Tor.
 
-## Fixes applied to make it boot
+## Credenciales locales (no son secretos)
 
-- `db/database.py`: `from models import Base` → `from db.models import Base`
-  (the bare import failed when loaded as `db.database` from the repo root).
-- `backend/static/` created (was missing; `StaticFiles` mount crashed on startup).
+- Admin: `/admin/login`, token por defecto `admin-secret-token` (`ADMIN_TOKEN`).
+- Postgres del compose: `faro:faro@db:5432/faro`.
+- Meili del compose: `http://meili:7700`, master key `dev-master-key`.
 
-## Local infra credentials (inline in compose, not secrets)
+## Convenciones del código
 
-- Postgres: `faro:faro@db:5432/faro`
-- MeiliSearch: `http://meili:7700`, master key `dev-master-key`
-- Admin login token: `admin-secret-token` (env `ADMIN_TOKEN`); log in at `/admin/login`.
+- Plantillas: `base.html` (shell público) + `admin_base.html` (shell del panel).
+- Todo el CSS vive en `backend/static/css/faro.css`. **No** agregar CDNs,
+  fuentes externas ni analytics: el portal se sirve por Tor.
+- Usar `templates.TemplateResponse(request, "x.html", ctx(request, ...))`
+  (firma moderna de Starlette). El `ctx()` agrega demo_mode, nav y versiones.
+- Filtros Jinja disponibles: `timeago`.
+- Las sesiones de DB usan `expire_on_commit=False`; los objetos se pueden
+  renderizar después de cerrar la sesión.
+- `db/database.py::_ensure_columns` agrega columnas nuevas a tablas viejas en el
+  boot (no hay framework de migraciones): si agregás una columna a un modelo
+  existente, registrala ahí también.
+- Rutas nuevas del panel: `nav='admin'`, `admin_nav='<sección>'` y
+  `pending_reports` para el badge del menú.
 
-## Optional external credentials (NOT required to boot)
+## Pruebas
 
-- `MAIL_USERNAME` / `MAIL_PASSWORD` / `MAIL_ALERT_TO` — email alerts (Gmail/SMTP).
-- `TOR_SOCKS_PROXY` + `TOR_SEED_URLS` — only for live crawling, not used in preview.
+```bash
+.venv/bin/pip install -r requirements-dev.txt
+.venv/bin/python -m pytest tests -q
+```
 
-No `requiredAtBoot` secrets exist; the app starts with no external credentials.
+Cubren normalización de términos, validez de direcciones v3, páginas públicas,
+API, reportes y login/flujo del panel.
 
-## Known gotchas
+## Gotchas
 
-- `crawler/spider.py` and `health_checker/checker.py` use bare imports
-  (`from database import …`, `from models import …`) that only work when run from
-  inside their own package; they are not invoked by the web app.
-- `backend/auth/security.py` imports `jose`, `passlib`, `pyotp`, `qrcode` which are
-  **not** in `requirements.txt`; it is unused by `main.py` so it does not break boot.
-- Search returns no results until the crawler populates Postgres + MeiliSearch;
-  with no Tor/crawl in the preview the index is intentionally empty.
+- `backend/auth/security.py` no se usa (depende de `jose`/`passlib`); no borrar
+  sin revisar `backend/auth/dependencies.py`.
+- `crawler/spider.py` y `health_checker/checker.py` usan imports relativos al
+  paquete; se ejecutan con `python -m crawler.spider`.
+- La semilla demo es idempotente: no duplica nodos. `FARO_SEED=0` la desactiva.

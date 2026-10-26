@@ -1,0 +1,100 @@
+{% extends "base.html" %}
+{% block title %}Estado de la red · FARO{% endblock %}
+
+{% block content %}
+<div class="wrap">
+  <section class="hero" style="padding-bottom:8px">
+    <h1 style="font-size:clamp(1.7rem,4vw,2.4rem)">Estado <em>de la red</em></h1>
+    <p class="lede" style="margin-bottom:0">
+      Salud agregada del índice, incidentes abiertos y los nodos que responden más lento.
+      Se actualiza en cada barrido de verificación.
+    </p>
+  </section>
+
+  <div class="stats-strip">
+    <div class="stat"><div class="k">nodos</div><div class="v">{{ stats.total }}</div></div>
+    <div class="stat"><div class="k">en línea</div><div class="v" style="color:var(--up)">{{ stats.online }}</div></div>
+    <div class="stat"><div class="k">caídos</div><div class="v" style="color:var(--down)">{{ stats.offline }}</div></div>
+    <div class="stat"><div class="k">uptime medio</div><div class="v">{{ stats.avg_uptime }}<small>%</small></div></div>
+    <div class="stat"><div class="k">motor</div><div class="v" style="font-size:1rem;padding-top:8px">{{ 'Meilisearch' if meili_online else 'local' }}</div></div>
+    <div class="stat"><div class="k">último chequeo</div><div class="v" style="font-size:1rem;padding-top:8px">{{ stats.last_check|timeago }}</div></div>
+  </div>
+
+  <div class="layout">
+    <div>
+      <section class="section" style="margin-top:0">
+        <div class="section-head"><h2>Incidentes abiertos</h2><span class="hint">{{ caidos|length }} nodo{{ '' if caidos|length == 1 else 's' }} sin respuesta</span></div>
+        {% if caidos %}
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Servicio</th><th>Dirección</th><th>Uptime</th><th>Último intento</th></tr></thead>
+            <tbody>
+              {% for s in caidos %}
+              <tr>
+                <td><a href="/sitio/{{ s.domain }}"><strong>{{ s.title }}</strong></a></td>
+                <td class="mono">{{ s.domain[:24] }}…</td>
+                <td>{{ (s.uptime_ratio * 100)|round|int }}%</td>
+                <td class="muted">{{ s.last_checked|timeago }}</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        {% else %}
+        <div class="notice">Sin incidentes: todos los nodos indexados respondieron en el último barrido.</div>
+        {% endif %}
+      </section>
+
+      <section class="section">
+        <div class="section-head"><h2>Respuestas más lentas</h2><span class="hint">latencia media en segundos</span></div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Servicio</th><th>Categoría</th><th>Latencia</th><th></th></tr></thead>
+            <tbody>
+              {% for s in lentos %}
+              <tr>
+                <td><a href="/sitio/{{ s.domain }}"><strong>{{ s.title }}</strong></a></td>
+                <td>{{ s.category or '—' }}</td>
+                <td class="nowrap">{{ '%.2f'|format(s.avg_response_time) }} s</td>
+                <td class="muted small">tor es lento por diseño</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </section>
+    </div>
+
+    <aside class="side">
+      <div class="panel">
+        <h3>Últimos chequeos</h3>
+        <ul class="mini-list">
+          {% for c in checks %}
+          <li>
+            <span class="t mono">{{ domains.get(c.site_id, 'nodo')[:16] }}…
+              <small>{{ c.checked_at.strftime('%m-%d %H:%M') }}</small>
+            </span>
+            <span class="badge {{ 'online' if c.online else 'offline' }}">{{ 'ok' if c.online else 'timeout' }}</span>
+          </li>
+          {% endfor %}
+        </ul>
+      </div>
+      <div class="panel">
+        <h3>Definiciones</h3>
+        <ul class="mini-list small">
+          <li><span class="muted">uptime</span><span>chequeos ok / total</span></li>
+          <li><span class="muted">timeout</span><span>sin respuesta a 30 s</span></li>
+          <li><span class="muted">espejo</span><span>mismo hash de contenido</span></li>
+        </ul>
+      </div>
+      <div class="panel">
+        <h3>Monitoreo</h3>
+        <p class="small muted" style="margin:0 0 10px">
+          Podés consultar el estado desde tu propio script con la API pública.
+        </p>
+        <a class="btn btn-ghost btn-sm" href="/api">Ver API</a>
+      </div>
+    </aside>
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,109 @@
+{% extends "base.html" %}
+{% block title %}API pública · FARO{% endblock %}
+
+{% block content %}
+<div class="wrap">
+  <section class="hero" style="padding-bottom:8px">
+    <h1 style="font-size:clamp(1.7rem,4vw,2.4rem)">API <em>pública</em></h1>
+    <p class="lede" style="margin-bottom:0">
+      JSON plano, sin claves ni cuotas para lectura. Los datos de salud son los mismos
+      que ve el portal, con hasta 100 chequeos de historia por nodo.
+    </p>
+  </section>
+
+  <div class="layout" style="padding:30px 0 20px">
+    <div>
+      <section class="section" style="margin-top:0">
+        <div class="section-head"><h2>Búsqueda</h2><span class="hint">GET /api/search</span></div>
+        <pre class="code">curl -s "<span class="k">/api/search?q=biblioteca&status=online&page=1</span>"
+
+{
+  "query": "biblioteca",
+  "page": 1,
+  "total": 2,
+  "pages": 1,
+  "engine": "local",
+  "elapsed_ms": 3,
+  "results": [
+    {
+      "url": "http://…onion",
+      "domain": "…onion",
+      "title": "Biblioteca Sombra",
+      "description": "Archivo de textos sobre vigilancia…",
+      "category": "Biblioteca",
+      "uptime_ratio": 0.94,
+      "avg_response_time": 0.71,
+      "last_checked": "2026-10-26T00:12:00",
+      "online": true
+    }
+  ]
+}</pre>
+        <p class="small muted">Parámetros: <code class="inline">q</code> (obligatorio, ≤120 caracteres),
+          <code class="inline">category</code>, <code class="inline">status</code>
+          (<code class="inline">todos|online|offline</code>),
+          <code class="inline">sort</code> (<code class="inline">relevancia|uptime|latencia|reciente</code>),
+          <code class="inline">page</code>.</p>
+      </section>
+
+      <section class="section">
+        <div class="section-head"><h2>Estadísticas</h2><span class="hint">GET /api/stats</span></div>
+        <pre class="code">curl -s "/api/stats"
+
+{
+  "generated_at": "2026-10-26T00:20:00",
+  "sites": {{ stats.total }},
+  "online": {{ stats.online }},
+  "avg_uptime": {{ stats.avg_uptime }},
+  "indexed_documents": {{ stats.indexed_documents }},
+  "engine": "local",
+  "categories": [
+    {"name": "Biblioteca", "count": 3}
+  ]
+}</pre>
+      </section>
+
+      <section class="section">
+        <div class="section-head"><h2>Nodos</h2><span class="hint">GET /api/sites</span></div>
+        <pre class="code">curl -s "/api/sites?category=Foros&limit=25"</pre>
+        <p class="small muted">Devuelve hasta 100 nodos con su estado de salud. Sin autenticación.</p>
+      </section>
+
+      <section class="section">
+        <div class="section-head"><h2>Salud del servicio</h2><span class="hint">GET /health</span></div>
+        <pre class="code">{"status":"healthy","service":"faro","version":"{{ app_version }}","meilisearch":false,"mode":"{{ 'sim' if demo_mode else 'live' }}"}</pre>
+      </section>
+    </div>
+
+    <aside class="side">
+      <div class="panel">
+        <h3>Índice actual</h3>
+        <ul class="mini-list small">
+          <li><span class="muted">nodos</span><span>{{ stats.total }}</span></li>
+          <li><span class="muted">documentos</span><span>{{ stats.indexed_documents }}</span></li>
+          <li><span class="muted">en línea</span><span style="color:var(--up)">{{ stats.online }}</span></li>
+          <li><span class="muted">bloqueados</span><span>{{ stats.blocked }}</span></li>
+        </ul>
+      </div>
+      <div class="panel">
+        <h3>Buenas prácticas</h3>
+        <p class="small muted" style="margin:0 0 10px">
+          Espaciá las consultas, no martilles nodos caídos y atribuí la fuente si
+          republicás el índice.
+        </p>
+        <p class="small muted mb-0">
+          Los reportes de usuarios son anónimos; no incluyas datos personales.
+        </p>
+      </div>
+      <div class="panel">
+        <h3>Enlaces</h3>
+        <ul class="mini-list small">
+          <li><a href="/api/search?q=foro">/api/search?q=foro</a></li>
+          <li><a href="/api/stats">/api/stats</a></li>
+          <li><a href="/api/sites">/api/sites</a></li>
+          <li><a href="/health">/health</a></li>
+        </ul>
+      </div>
+    </aside>
+  </div>
+</div>
+{% endblock %}

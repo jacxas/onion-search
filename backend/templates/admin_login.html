@@ -1,108 +1,31 @@
-<!DOCTYPE html>
-<html lang="es">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Admin Login - Onion Search</title>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <style>
-    * { box-sizing: border-box; margin: 0; padding: 0; }
-    body {
-      font-family: 'Inter', sans-serif;
-      background: linear-gradient(135deg, #0f0f1a 0%, #1a1a2e 100%);
-      color: #e8e8ed;
-      min-height: 100vh;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      padding: 2rem;
-    }
-    .login-card {
-      background: rgba(255,255,255,0.03);
-      padding: 3rem;
-      border-radius: 16px;
-      border: 1px solid rgba(255,255,255,0.1);
-      width: 100%;
-      max-width: 420px;
-      box-shadow: 0 20px 60px rgba(0,0,0,0.3);
-    }
-    h1 {
-      font-size: 1.75rem;
-      font-weight: 700;
-      margin-bottom: 0.5rem;
-      background: linear-gradient(90deg, #00d9ff, #7b2cbf);
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
-    }
-    .subtitle {
-      color: #8888a0;
-      margin-bottom: 2rem;
-      font-size: 0.95rem;
-    }
-    .form-group {
-      margin-bottom: 1.5rem;
-    }
-    label {
-      display: block;
-      margin-bottom: 0.5rem;
-      font-size: 0.9rem;
-      color: #aaa;
-    }
-    input[type="password"] {
-      width: 100%;
-      padding: 0.875rem 1rem;
-      font-size: 1rem;
-      border: 1px solid rgba(255,255,255,0.1);
-      border-radius: 8px;
-      background: rgba(15,15,30,0.8);
-      color: #fff;
-      outline: none;
-    }
-    input[type="password"]:focus {
-      border-color: #00d9ff;
-      box-shadow: 0 0 0 2px rgba(0,217,255,0.2);
-    }
-    button {
-      width: 100%;
-      padding: 1rem;
-      font-size: 1rem;
-      background: linear-gradient(90deg, #00d9ff, #0099cc);
-      color: #0f0f1a;
-      border: none;
-      border-radius: 8px;
-      cursor: pointer;
-      font-weight: 600;
-      transition: transform 0.2s;
-    }
-    button:hover {
-      transform: translateY(-2px);
-    }
-    .error {
-      background: rgba(248,113,113,0.15);
-      color: #f87171;
-      padding: 0.75rem 1rem;
-      border-radius: 8px;
-      margin-bottom: 1.5rem;
-      font-size: 0.9rem;
-    }
-  </style>
-</head>
-<body>
+{% extends "base.html" %}
+{% block title %}Acceso al centro de mando · FARO{% endblock %}
+
+{% block content %}
+<div class="login-stage">
   <div class="login-card">
-    <h1>Admin Dashboard</h1>
-    <p class="subtitle">IngresÃ¡ para gestionar el motor de bÃºsqueda</p>
-    
-    {% if error %}
-    <div class="error">{{ error }}</div>
-    {% endif %}
-    
+    <div class="brand">
+      <svg class="brand-mark" viewBox="0 0 48 48" fill="none" aria-hidden="true">
+        <path d="M18 44h12l-2.2-20h-7.6L18 44Z" fill="#f0a020"/>
+        <rect x="19.5" y="9.5" width="9" height="11" rx="2" fill="#ffe6b0"/>
+        <path d="M20 12.5 8 9M28 12.5 40 9" stroke="#ffc45c" stroke-width="1.6" stroke-linecap="round" opacity=".55"/>
+      </svg>
+      <span class="brand-name" style="font-size:1.1rem">FARO</span>
+    </div>
+    <h1>Centro de mando</h1>
+    <p class="sub">Ingresá el token de administración para gestionar el índice.</p>
+
+    {% if error %}<div class="notice error">{{ error }}</div>{% endif %}
+
     <form action="/admin/login" method="post">
-      <div class="form-group">
-        <label for="token">Token de administrador</label>
-        <input type="password" id="token" name="token" required autofocus>
-      </div>
-      <button type="submit">Ingresar</button>
+      <input type="hidden" name="next" value="{{ next }}">
+      <label class="field" for="token">Token de administrador</label>
+      <input class="input" type="password" id="token" name="token" autocomplete="current-password" required autofocus>
+      <button class="btn btn-primary" type="submit">Ingresar</button>
     </form>
+
+    <p class="foot">Acceso restringido · sesión de 8 h · cookie httpOnly</p>
+    <p class="foot"><a href="/">← volver al portal</a></p>
   </div>
-</body>
-</html>
+</div>
+{% endblock %}

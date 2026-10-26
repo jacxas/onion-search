@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+{% block title %}{{ code }} · FARO{% endblock %}
+
+{% block content %}
+<div class="wrap">
+  <div class="empty" style="margin:80px 0;padding:70px 24px">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true">
+      <path d="M12 3 3 20h18L12 3Z" stroke-linejoin="round"/>
+      <path d="M12 9v5M12 17.2v.1" stroke-linecap="round"/>
+    </svg>
+    <h3 style="font-size:1.4rem">{{ title }}</h3>
+    <p style="max-width:460px;margin:8px auto 22px">{{ message }}</p>
+    <div class="row" style="justify-content:center">
+      <a class="btn btn-primary" href="/">Volver al faro</a>
+      <a class="btn btn-ghost" href="/directorio">Ver directorio</a>
+    </div>
+    <p class="small muted" style="margin-top:20px">código {{ code }}</p>
+  </div>
+</div>
+{% endblock %}

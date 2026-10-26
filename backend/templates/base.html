@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="color-scheme" content="dark">
+  <meta name="description" content="FARO — buscador independiente de servicios .onion con verificación de disponibilidad.">
+  <meta name="referrer" content="no-referrer">
+  <title>{% block title %}FARO · buscador onion{% endblock %}</title>
+  <link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
+  <link rel="stylesheet" href="/static/css/faro.css">
+  {% block head %}{% endblock %}
+</head>
+<body>
+  <header class="site-header">
+    <div class="wrap">
+      <a class="brand" href="/" aria-label="FARO, inicio">
+        <svg class="brand-mark" viewBox="0 0 48 48" fill="none" aria-hidden="true">
+          <defs>
+            <linearGradient id="faro-beam" x1="24" y1="4" x2="24" y2="44" gradientUnits="userSpaceOnUse">
+              <stop stop-color="#ffd98a"/><stop offset="1" stop-color="#f0a020"/>
+            </linearGradient>
+          </defs>
+          <path d="M18 44h12l-2.2-20h-7.6L18 44Z" fill="url(#faro-beam)" opacity=".92"/>
+          <rect x="17.5" y="20.5" width="13" height="3.6" rx="1.2" fill="#0a0f15"/>
+          <rect x="19.5" y="9.5" width="9" height="11" rx="2" fill="#ffe6b0"/>
+          <path d="M24 3.5 25.6 8h-3.2L24 3.5Z" fill="#ffd98a"/>
+          <path d="M20 12.5 6 8.5M28 12.5 42 8.5M20 16.5 8 20M28 16.5 40 20"
+                stroke="#ffc45c" stroke-width="1.6" stroke-linecap="round" opacity=".6"/>
+          <path d="M13 40c4-1.6 8-2.4 11-2.4S31 38.4 35 40" stroke="#4fd1c5" stroke-width="1.6"
+                stroke-linecap="round" opacity=".7"/>
+        </svg>
+        <span>
+          <span class="brand-name">FARO</span><br>
+          <span class="brand-tag">buscador onion</span>
+        </span>
+      </a>
+
+      <nav class="nav" aria-label="Navegación principal">
+        <a href="/" class="{{ 'active' if not nav else '' }}">Inicio</a>
+        <a href="/search" class="{{ 'active' if nav == 'search' else '' }}">Buscar</a>
+        <a href="/directorio" class="{{ 'active' if nav == 'directorio' else '' }}">Directorio</a>
+        <a href="/estado" class="{{ 'active' if nav == 'estado' else '' }}"><span class="dot"></span>Estado</a>
+        <a href="/api" class="{{ 'active' if nav == 'api' else '' }}">API</a>
+        <a href="/admin" class="{{ 'active' if nav == 'admin' else '' }}">Panel</a>
+      </nav>
+    </div>
+  </header>
+
+  {% if demo_mode %}
+  <div class="demo-flag">
+    <div class="wrap">
+      <span class="badge pending">modo demo</span>
+      <span>Índice de demostración con datos sintéticos. El rastreo real requiere Tor:
+      <code>CRAWL_MODE=live</code> + <code>TOR_SOCKS_PROXY</code>.</span>
+    </div>
+  </div>
+  {% endif %}
+
+  <main>
+    {% block content %}{% endblock %}
+  </main>
+
+  <footer class="site-footer">
+    <div class="wrap">
+      <div>
+        <div class="brand" style="margin-bottom:10px">
+          <svg class="brand-mark" viewBox="0 0 48 48" fill="none" aria-hidden="true">
+            <path d="M18 44h12l-2.2-20h-7.6L18 44Z" fill="#f0a020" opacity=".9"/>
+            <rect x="19.5" y="9.5" width="9" height="11" rx="2" fill="#ffe6b0"/>
+            <path d="M20 12.5 8 9M28 12.5 40 9" stroke="#ffc45c" stroke-width="1.6" stroke-linecap="round" opacity=".55"/>
+          </svg>
+          <span class="brand-name" style="font-size:1.05rem">FARO</span>
+        </div>
+        <p style="margin:0;max-width:330px">
+          Buscador independiente de servicios <span class="mono">.onion</span>.
+          Sin anuncios, sin rastreo, sin recursos de terceros.
+        </p>
+        <p class="small" style="margin:12px 0 0">v{{ app_version }} · modo {{ 'demo' if demo_mode else 'live' }}</p>
+      </div>
+      <div class="foot-cols">
+        <div class="foot-col">
+          <h4>Portal</h4>
+          <a href="/search">Búsqueda</a>
+          <a href="/directorio">Directorio</a>
+          <a href="/estado">Estado de la red</a>
+          <a href="/azar">Nodo al azar</a>
+        </div>
+        <div class="foot-col">
+          <h4>Desarrolladores</h4>
+          <a href="/api">API pública</a>
+          <a href="/api/stats">/api/stats</a>
+          <a href="/health">/health</a>
+        </div>
+        <div class="foot-col">
+          <h4>Operación</h4>
+          <a href="/admin">Centro de mando</a>
+          <a href="/admin/reports">Reportes</a>
+          <a href="/admin/blocklist">Blocklist</a>
+        </div>
+      </div>
+    </div>
+  </footer>
+</body>
+</html>
