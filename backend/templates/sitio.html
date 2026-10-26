@@ -1,0 +1,164 @@
+{% extends "base.html" %}
+{% block title %}{{ site.title }} · FARO{% endblock %}
+
+{% block content %}
+<div class="wrap">
+  <div class="detail-head">
+    <div class="crumbs">
+      <a href="/">FARO</a> /
+      <a href="/directorio">directorio</a> /
+      {% if site.category %}<a href="/search?category={{ site.category|urlencode }}">{{ site.category }}</a> /{% endif %}
+      <span>{{ site.domain[:24] }}…</span>
+    </div>
+
+    <div class="detail-title">
+      <div style="flex:1;min-width:260px">
+        <h1>{{ site.title }}</h1>
+        <div class="addr">
+          <span class="tag">onion</span>
+          <span id="addr">{{ site.domain }}</span>
+          <button class="btn btn-ghost btn-sm" type="button" onclick="navigator.clipboard.writeText('{{ site.domain }}').then(()=>{this.textContent='copiado';setTimeout(()=>this.textContent='copiar',1400)})">copiar</button>
+        </div>
+        {% if site.description %}<p class="detail-desc">{{ site.description }}</p>{% endif %}
+      </div>
+    </div>
+
+    <div class="row" style="margin:18px 0 4px">
+      <span class="badge {{ 'online' if site.online else 'offline' }}">
+        <span class="{{ 'dot-up' if site.online else 'dot-down' }}"></span>
+        {{ 'en línea' if site.online else 'caído' }}
+      </span>
+      {% if site.category %}<span class="badge cat">{{ site.category }}</span>{% endif %}
+      {% if site.is_mirror %}<span class="badge mirror">espejo verificado</span>{% endif %}
+      {% if site_obj.is_blocked %}<span class="badge blocked">bloqueado</span>{% endif %}
+      {% if site.category %}<a class="badge neutral" href="/search?category={{ site.category|urlencode }}">más de {{ site.category }}</a>{% endif %}
+    </div>
+
+    <div class="kv-grid">
+      <div class="kv"><div class="k">uptime (100 chequeos)</div><div class="v">{{ (site.uptime_ratio * 100)|round|int }}%</div></div>
+      <div class="kv"><div class="k">latencia media</div><div class="v">{{ ('%.2f'|format(site.avg_response_time) ~ ' s') if site.avg_response_time else '—' }}</div></div>
+      <div class="kv"><div class="k">chequeos totales</div><div class="v">{{ site_obj.total_checks }}</div></div>
+      <div class="kv"><div class="k">última respuesta</div><div class="v">{{ site.last_checked|timeago }}</div></div>
+      <div class="kv"><div class="k">primera indexación</div><div class="v" style="font-size:.95rem;padding-top:4px">{{ site_obj.first_crawled.strftime('%Y-%m-%d') if site_obj.first_crawled else '—' }}</div></div>
+    </div>
+  </div>
+
+  {% if reportado %}
+  <div class="notice">Gracias. El reporte quedó registrado y el equipo lo revisa antes de modificar el índice.</div>
+  {% endif %}
+
+  <div class="layout" style="padding-bottom:40px">
+    <div>
+      <section class="section" style="margin-top:8px">
+        <div class="section-head">
+          <h2>Historial de salud</h2>
+          <span class="hint">últimos {{ checks|length }} chequeos</span>
+        </div>
+        <div class="panel">
+          {% if checks %}
+          <div class="history" role="img" aria-label="Historial de disponibilidad">
+            {% for c in checks %}
+            <div class="bar {{ '' if c.online else 'down' }}"
+                 style="height: {{ 34 if c.online else 20 }}%"
+                 title="{{ c.checked_at.strftime('%Y-%m-%d %H:%M') }} · {{ 'en línea' if c.online else 'sin respuesta' }}{% if c.response_time %} · {{ '%.2f'|format(c.response_time) }} s{% endif %}"></div>
+            {% endfor %}
+          </div>
+          <div class="history-legend">
+            <span><span class="dot-up"></span> respuesta</span>
+            <span><span class="dot-down"></span> tiempo agotado</span>
+            <span class="muted">pasá el cursor por cada barra</span>
+          </div>
+          {% else %}
+          <p class="small muted mb-0">Todavía no hay chequeos registrados para este nodo.</p>
+          {% endif %}
+        </div>
+      </section>
+
+      {% if mirrors %}
+      <section class="section">
+        <div class="section-head"><h2>Espejos</h2><span class="hint">mismo contenido, otra dirección</span></div>
+        <div class="result-list">
+          {% for m in mirrors %}
+          <a class="result" href="/sitio/{{ m.domain }}">
+            <h3>{{ m.title }}</h3>
+            <div class="url">{{ m.domain }}</div>
+            <div class="meta">
+              <span class="badge {{ 'online' if m.online else 'offline' }}">{{ 'en línea' if m.online else 'caído' }}</span>
+              <span>uptime {{ (m.uptime_ratio * 100)|round|int }}%</span>
+              <span>verificado {{ m.last_checked|timeago }}</span>
+            </div>
+          </a>
+          {% endfor %}
+        </div>
+      </section>
+      {% endif %}
+
+      {% if related %}
+      <section class="section">
+        <div class="section-head"><h2>También en {{ site.category or 'el índice' }}</h2></div>
+        <div class="result-list">
+          {% for r in related %}
+          <a class="result" href="/sitio/{{ r.domain }}">
+            <h3>{{ r.title }}</h3>
+            <div class="url">{{ r.domain }}</div>
+            <div class="meta">
+              <span class="badge {{ 'online' if r.online else 'offline' }}">{{ 'en línea' if r.online else 'caído' }}</span>
+              <span>uptime {{ (r.uptime_ratio * 100)|round|int }}%</span>
+            </div>
+          </a>
+          {% endfor %}
+        </div>
+      </section>
+      {% endif %}
+    </div>
+
+    <aside class="side">
+      <div class="panel" id="reportar">
+        <h3>Reportar este nodo</h3>
+        <form class="form-grid" action="/sitio/{{ site.domain }}/reportar" method="post">
+          <div>
+            <label class="field" for="reason">Motivo</label>
+            <select class="select" id="reason" name="reason" style="width:100%">
+              {% for key, label in report_reasons %}
+              <option value="{{ key }}">{{ label }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div>
+            <label class="field" for="details">Detalle (opcional)</label>
+            <textarea class="input" id="details" name="details" maxlength="2000" placeholder="Qué viste, cuándo, qué esperabas…"></textarea>
+          </div>
+          <div class="form-actions">
+            <button class="btn btn-primary btn-sm" type="submit">Enviar reporte</button>
+            <span class="small muted">Se revisa antes de actuar.</span>
+          </div>
+        </form>
+      </div>
+
+      {% if reports %}
+      <div class="panel">
+        <h3>Reportes recientes</h3>
+        <ul class="mini-list">
+          {% for rep in reports %}
+          <li>
+            <span class="t">{{ rep.reason }}<small>{{ rep.created_at|timeago }}</small></span>
+            <span class="badge {{ 'pending' if rep.status == 'pendiente' else 'neutral' }}">{{ rep.status }}</span>
+          </li>
+          {% endfor %}
+        </ul>
+      </div>
+      {% endif %}
+
+      <div class="panel">
+        <h3>Antes de abrir</h3>
+        <ul class="mini-list small">
+          <li><span class="muted">Usá el navegador Tor</span></li>
+          <li><span class="muted">No inicies sesión con datos reales</span></li>
+          <li><span class="muted">Verificá el dominio carácter por carácter</span></li>
+          <li><span class="muted">Un uptime bajo no siempre es un ataque</span></li>
+        </ul>
+      </div>
+    </aside>
+  </div>
+</div>
+{% endblock %}

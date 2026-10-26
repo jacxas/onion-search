@@ -12,6 +12,16 @@ services:
       interval: 5s
       timeout: 3s
       retries: 10
+    restart: on-failure
+
+  meili:
+    image: getmeili/meilisearch:v1.12
+    environment:
+      MEILI_MASTER_KEY: dev-master-key
+      MEILI_ENV: production
+    volumes:
+      - meilidata:/meili_data
+    restart: on-failure
 
   tor:
     image: dperson/torproxy:latest
@@ -28,25 +38,19 @@ services:
       tor:
         condition: service_started
     environment:
-      DATABASE_URL: postgres://faro:faro@db:5432/faro
+      DATABASE_URL: postgresql+psycopg2://faro:faro@db:5432/faro
       CRAWL_MODE: live
       TOR_SOCKS_PROXY: socks5h://tor:9050
-      # TOR_SEED_URLS: "http://<hub1>.onion/,http://<hub2>.onion/"
+      MEILI_URL: http://meili:7700
+      MEILI_MASTER_KEY: dev-master-key
+      FARO_SEED: "0"
       # ADMIN_TOKEN: "cambiame"
+      # TOR_SEED_URLS: "http://<hub1>.onion/,http://<hub2>.onion/"
     ports:
-      - "3000:3000"   # acceso clearnet local (la interfaz onion sale por tor:9050)
-
-  # aplicar el esquema una sola vez
-  migrate:
-    build: .
-    command: npx drizzle-kit push --force
-    depends_on:
-      db:
-        condition: service_healthy
-    environment:
-      DATABASE_URL: postgres://faro:faro@db:5432/faro
-    profiles: ["migrate"]
+      - "3000:3000"
+    restart: on-failure
 
 volumes:
   pgdata:
+  meilidata:
   tordata:

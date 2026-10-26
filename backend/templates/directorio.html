@@ -1,0 +1,65 @@
+{% extends "base.html" %}
+{% block title %}Directorio de nodos · FARO{% endblock %}
+
+{% block content %}
+<div class="wrap">
+  <section class="hero" style="padding-bottom:8px">
+    <h1 style="font-size:clamp(1.7rem,4vw,2.4rem)">Directorio <em>de nodos</em></h1>
+    <p class="lede" style="margin-bottom:0">
+      {{ stats.total }} servicios onion agrupados por categoría, ordenados por disponibilidad.
+      Los nodos bloqueados no se muestran.
+    </p>
+  </section>
+
+  <div class="filters" style="margin-top:26px">
+    <a class="chip {{ 'active' if not active_category else '' }}" href="/directorio">Todas ({{ stats.total }})</a>
+    {% for c in categories %}
+    <a class="chip {{ 'active' if active_category == c.name else '' }}" href="/directorio?category={{ c.name|urlencode }}">{{ c.name }} ({{ c.count }})</a>
+    {% endfor %}
+  </div>
+
+  <div class="stats-strip">
+    <div class="stat"><div class="k">en línea</div><div class="v" style="color:var(--up)">{{ stats.online }}</div></div>
+    <div class="stat"><div class="k">caídos</div><div class="v" style="color:var(--down)">{{ stats.offline }}</div></div>
+    <div class="stat"><div class="k">uptime medio</div><div class="v">{{ stats.avg_uptime }}<small>%</small></div></div>
+    <div class="stat"><div class="k">categorías</div><div class="v">{{ categories|length }}</div></div>
+    <div class="stat"><div class="k">último barrido</div><div class="v" style="font-size:1.05rem;padding-top:6px">{{ stats.last_check|timeago }}</div></div>
+  </div>
+
+  {% if grouped %}
+    {% for category, sites in grouped.items() %}
+    <section class="section">
+      <div class="section-head">
+        <h2>{{ category }}</h2>
+        <span class="hint">{{ sites|length }} nodo{{ '' if sites|length == 1 else 's' }}</span>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr><th>Servicio</th><th>Dirección</th><th>Estado</th><th>Uptime</th><th>Latencia</th><th>Verificado</th></tr>
+          </thead>
+          <tbody>
+            {% for s in sites %}
+            <tr>
+              <td><a href="/sitio/{{ s.url | replace('http://', '') }}"><strong>{{ s.title }}</strong></a>
+                {% if s.is_mirror %}<span class="badge mirror" style="margin-left:6px">espejo</span>{% endif %}</td>
+              <td class="mono">{{ (s.url | replace('http://', ''))[:26] }}…</td>
+              <td><span class="badge {{ 'online' if s.online else 'offline' }}">{{ 'en línea' if s.online else 'caído' }}</span></td>
+              <td class="nowrap">{{ (s.uptime_ratio * 100)|round|int }}%</td>
+              <td class="nowrap">{{ ('%.2f'|format(s.avg_response_time) ~ ' s') if s.avg_response_time else '—' }}</td>
+              <td class="nowrap muted">{{ s.last_checked|timeago }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </section>
+    {% endfor %}
+  {% else %}
+  <div class="empty" style="margin-top:30px">
+    <h3>El directorio está vacío</h3>
+    <p>Cargá semillas desde el <a href="/admin/actions">centro de mando</a> o esperá el próximo rastreo.</p>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

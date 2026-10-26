@@ -1,31 +1,37 @@
-# ── FARO · motor de búsqueda .onion ──────────────────────────────────────
-FROM node:22-alpine AS deps
-WORKDIR /app
-COPY package.json package-lock.json* ./
-RUN npm ci
+# ── FARO · portal de búsqueda .onion ────────────────────────────────────
+FROM python:3.11-slim
 
-FROM node:22-alpine AS builder
-WORKDIR /app
-COPY --from=deps /app/node_modules ./node_modules
-COPY . .
-ENV NEXT_TELEMETRY_DISABLED=1
-# DATABASE_URL solo se necesita en runtime, no en build
-RUN npm run build
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PORT=3000
 
-FROM node:22-alpine AS runner
 WORKDIR /app
-ENV NODE_ENV=production NEXT_TELEMETRY_DISABLED=1
-RUN addgroup -S faro && adduser -S faro -G faro
-COPY --from=builder /app/public ./public
-COPY --from=builder /app/.next/standalone ./
-COPY --from=builder /app/.next/static ./.next/static
+
+RUN addgroup --system faro && adduser --system --ingroup faro faro
+
+COPY requirements.txt ./
+RUN pip install --no-cache-dir -r requirements.txt
+
+COPY backend ./backend
+COPY db ./db
+COPY indexer ./indexer
+COPY crawler ./crawler
+COPY health_checker ./health_checker
+
+RUN chown -R faro:faro /app
 USER faro
+
 EXPOSE 3000
-ENV PORT=3000
-# Variables esperadas en runtime:
-#   DATABASE_URL      postgres://user:pass@db:5432/app_db
-#   CRAWL_MODE        live           (tor real) | sim (red simulada)
-#   TOR_SOCKS_PROXY   socks5h://tor:9050
-#   TOR_SEED_URLS     lista de semillas .onion separadas por comas (opcional)
-#   ADMIN_TOKEN       token para /api/admin/run (recomendado en producción)
-CMD ["node", "server.js"]
+
+HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
+  CMD python -c "import urllib.request; urllib.request.urlopen('http://127.0.0.1:3000/health').read()"
+
+# Variables de runtime:
+#   DATABASE_URL       postgresql+psycopg2://faro:faro@db:5432/faro
+#   ADMIN_TOKEN        token del centro de mando (/admin)
+#   CRAWL_MODE         live (Tor real) | sim (demo, por defecto)
+#   TOR_SOCKS_PROXY    socks5h://tor:9050   (solo live)
+#   TOR_SEED_URLS      semillas separadas por comas (opcional)
+#   MEILI_URL / MEILI_MASTER_KEY  (opcional, acelera la búsqueda)
+#   FARO_SEED=0        desactiva la semilla de demostración
+CMD ["uvicorn", "backend.main:app", "--host", "0.0.0.0", "--port", "3000"]

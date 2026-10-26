@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% block title %}{% block admin_title %}Centro de mando{% endblock %} · FARO{% endblock %}
+
+{% block content %}
+<div class="wrap">
+  <div class="admin-shell">
+    <nav class="admin-nav" aria-label="Administración">
+      <div class="role">Centro de mando</div>
+      <a href="/admin" class="{{ 'active' if admin_nav == 'dashboard' else '' }}">Resumen</a>
+      <a href="/admin/sites" class="{{ 'active' if admin_nav == 'sites' else '' }}">Nodos</a>
+      <a href="/admin/reports" class="{{ 'active' if admin_nav == 'reports' else '' }}">
+        Reportes{% if pending_reports %} <span class="badge pending" style="margin-left:6px">{{ pending_reports }}</span>{% endif %}
+      </a>
+      <a href="/admin/blocklist" class="{{ 'active' if admin_nav == 'blocklist' else '' }}">Blocklist</a>
+      <a href="/admin/actions" class="{{ 'active' if admin_nav == 'actions' else '' }}">Acciones</a>
+      <div class="sep"></div>
+      <div class="role">Portal</div>
+      <a href="/">Ver sitio público</a>
+      <a href="/estado">Estado de la red</a>
+      <a href="/admin/logout">Cerrar sesión</a>
+    </nav>
+
+    <div>
+      {% block admin_content %}{% endblock %}
+    </div>
+  </div>
+</div>
+{% endblock %}
