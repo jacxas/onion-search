@@ -1,0 +1,50 @@
+# FARO con Tor integrado (modo live en Fly.io).
+#
+# Misma app que el Dockerfile principal, más un demonio Tor que expone:
+#   · SOCKS5 en 127.0.0.1:9050  → salida hacia la red onion
+#   · servicio oculto v3        → publica el propio portal como .onion
+#
+# Build (desde la raíz del repo):
+#   fly deploy --config deploy/fly/fly.tor.toml
+#
+# Con esta imagen, el entrypoint arranca tor, espera el SOCKS y recién ahí
+# ejecuta el comando del grupo de proceso (app o worker).
+
+FROM python:3.11-slim
+
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PORT=3000 \
+    CRAWL_MODE=live \
+    TOR_SOCKS_PROXY=socks5h://127.0.0.1:9050
+
+# tor + curl para el healthcheck del SOCKS
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends tor curl ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+COPY requirements.txt ./
+RUN pip install --no-cache-dir -r requirements.txt
+
+COPY backend ./backend
+COPY db ./db
+COPY indexer ./indexer
+COPY crawler ./crawler
+COPY health_checker ./health_checker
+COPY scripts ./scripts
+COPY blocklist.txt seed_list.txt ./
+COPY deploy/fly/torrc /etc/tor/torrc
+COPY deploy/fly/entrypoint-tor.sh /usr/local/bin/faro-entrypoint
+
+RUN chmod +x /usr/local/bin/faro-entrypoint \
+    && mkdir -p /var/lib/tor/faro \
+    && chown -R debian-tor:debian-tor /var/lib/tor \
+    && chmod 700 /var/lib/tor/faro
+
+EXPOSE 3000
+
+# El healthcheck HTTP lo hace Fly con [[http_service.checks]].
+ENTRYPOINT ["/usr/local/bin/faro-entrypoint"]
+CMD ["uvicorn", "backend.main:app", "--host", "0.0.0.0", "--port", "3000"]

@@ -1,0 +1,33 @@
+# Contexto de build para Docker / Fly.io
+.git
+.gitignore
+.venv
+venv
+__pycache__
+*.pyc
+*.pyo
+.pytest_cache
+.mypy_cache
+.ruff_cache
+
+# datos locales (la base real va en Postgres)
+faro.db
+faro.db-journal
+*.sqlite3
+
+# frontend legado / artefactos
+node_modules
+.next
+dist
+build
+out
+
+# tests: no van a la imagen (la imagen Tor sí necesita deploy/fly/*)
+tests
+*.md
+!README.md
+.env
+.env.*
+!.env.example
+torrc.example
+# seed_list.txt y blocklist.txt NO se excluyen: Dockerfile.tor los copia.
