@@ -41,6 +41,7 @@ todo lo que carga el navegador sale del propio onion).
 GET /api/search?q=biblioteca&status=online&sort=uptime&page=1
 GET /api/stats
 GET /api/sites?category=Foros&limit=25
+GET /api/status          # corridas del pipeline y si hay tareas activas
 GET /health
 ```
 
@@ -55,17 +56,58 @@ latencia, último chequeo y estado online. Sin claves ni cuotas de lectura.
 - **Nodos**: búsqueda y filtros; bloquear/desbloquear.
 - **Reportes**: bandeja anónima con acciones (bloquear o descartar).
 - **Blocklist**: alta y baja de direcciones .onion.
-- **Acciones**: chequeo de salud, rastreo, reindexado y carga de la semilla demo.
+- **Operaciones**: lanzar rastreo y chequeo de salud, reindexar, ver las
+  últimas corridas con resultado y duración, y administrar las semillas.
 
-## Modo demo vs modo live
+## Pipeline de rastreo y salud
 
-- `CRAWL_MODE=sim` (default): carga una semilla determinista de ~27 nodos con
-  títulos, categorías, uptime, historial y espejos sintéticos. Sirve para
-  recorrer el portal sin Tor ni datos reales. La portada lo indica con una
-  franja «modo demo».
-- `CRAWL_MODE=live`: el crawler (`crawler/`) rastrea por `TOR_SOCKS_PROXY`
-  (`socks5h`, DNS remoto) y el health checker alimenta uptime e historial.
-  Desactivá la semilla con `FARO_SEED=0`.
+El pipeline es real y está integrado al portal: se dispara desde
+`/admin/actions` y corre en un hilo aparte, sin bloquear las respuestas.
+El progreso queda en la tabla `crawl_runs`, así que el panel (y `/api/status`)
+lo puede leer aunque el trabajo lo haga otro proceso.
+
+```
+semillas (DB · TOR_SEED_URLS · seed_list.txt)
+      │
+      ▼
+CrawlPipeline ── transporte SOCKS5 (live) o red simulada (sim)
+      │            extrae título, descripción, texto y enlaces .onion
+      │            deduplica por huella SHA-256 → marca espejos
+      │            respeta blocklist (dominio y huella) + profundidad y tope
+      ▼
+OnionSite + SiteCheck  ──►  Meilisearch (si está)  ──►  ranking del portal
+```
+
+- **Una entrada por nodo**: todas las rutas de un host colapsan en
+  `http://<host>`; el crawler indexa servicios, no páginas sueltas.
+- **Salud**: hasta 80 nodos por barrido con 8 hilos, latencia medida y ventana
+  de uptime sobre los últimos chequeos; cada resultado va a `SiteCheck`.
+- **Semillas**: se administran desde el panel (alta, pausa, borrado) y se
+  combinan con `TOR_SEED_URLS` y `seed_list.txt`.
+- **Tareas**: una sola corrida por tipo a la vez (single-flight en proceso y en
+  base); las corridas interrumpidas por un reinicio se marcan como error.
+
+### Modo demo vs modo live
+
+- `CRAWL_MODE=sim` (default): el mismo pipeline corre contra una **red onion
+  simulada determinista** (33 nodos, contenidos y caídas fijas). Se puede
+  rastrear, descubrir enlaces y verificar salud sin Tor. Algunos nodos solo
+  aparecen siguiendo enlaces, como en la red real.
+- `CRAWL_MODE=live`: todo el tráfico va por `TOR_SOCKS_PROXY`
+  (`socks5h://…`, DNS remoto). Antes de arrancar se verifica el proxy; si Tor
+  no responde, la corrida termina con un mensaje claro en el panel.
+- `FARO_SEED=0` desactiva la semilla demo (recomendado en producción).
+
+### CLI y tareas programadas
+
+```bash
+python -m crawler                          # rastreo único de las semillas
+python -m health_checker                   # barrido de salud único
+python -m scripts.worker                   # ciclo continuo (salud 30 min, rastreo 3 h)
+python -m scripts.worker --once            # un barrido y sale
+```
+
+El compose incluye un servicio `worker` con el ciclo continuo apuntando a Tor.
 
 La búsqueda usa Meilisearch si responde en `MEILI_URL`; si no, cae al motor
 local (título > descripción > contenido, con boost por uptime y estado). El
@@ -121,14 +163,22 @@ db/models.py               OnionSite · SiteCheck · SiteReport · Blocklist
 db/seed.py                 semilla demo determinista
 db/database.py             engine, sesiones, init del esquema
 indexer/meili_client.py    cliente Meilisearch tolerante a fallos
-crawler/ · health_checker/ rastreo Tor y verificación de salud
+crawler/transport.py       TorTransport (SOCKS5) + red simulada determinista
+crawler/parse.py           extracción de título, texto y enlaces
+crawler/pipeline.py        semillas → rastreo → dedupe/espejos → índice
+health_checker/checker.py  barrido de salud concurrente + SiteCheck
+backend/jobs.py            cola single-flight en hilos + progreso en CrawlRun
+scripts/worker.py          tareas programadas (salud / rastreo)
 tests/                     pruebas de humo del portal
 scripts/start.sh           arranque local
 ```
 
 ## Notas de operación
 
-- El crawler es cortés y secuencial: los servicios onion son lentos por diseño.
+- El crawler es cortés: una petición por nodo, delays entre páginas y topes de
+  profundidad; los servicios onion son lentos por diseño.
+- En modo live, si Tor no está arriba la tarea falla rápido con diagnóstico en
+  el panel en vez de dejar cientos de timeouts.
 - Los nodos caídos siguen indexados pero penalizados; el filtro «en línea» los
   excluye.
 - Revisá la legislación de tu jurisdicción antes de rastrear la dark web.

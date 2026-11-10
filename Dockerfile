@@ -17,6 +17,7 @@ COPY db ./db
 COPY indexer ./indexer
 COPY crawler ./crawler
 COPY health_checker ./health_checker
+COPY scripts ./scripts
 
 RUN chown -R faro:faro /app
 USER faro

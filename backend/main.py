@@ -14,7 +14,7 @@ from urllib.parse import quote_plus
 from typing import List, Optional
 
 from fastapi import (
-    BackgroundTasks, Depends, FastAPI, Form, HTTPException, Query, Request,
+    Depends, FastAPI, Form, HTTPException, Query, Request,
 )
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
@@ -22,9 +22,13 @@ from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel
 from sqlalchemy import desc, func, or_
 
+from backend import jobs
 from backend.search import global_stats, search_sites
-from db.database import SessionLocal, get_db, init_db
-from db.models import Blocklist, OnionSite, SiteCheck, SiteReport
+from crawler.transport import build_transport, domain_of as transport_domain
+from db.database import get_db, init_db
+from db.models import (
+    Blocklist, CrawlRun, CrawlSeed, OnionSite, SiteCheck, SiteReport,
+)
 from db.seed import seed_demo_data
 from indexer.meili_client import create_indexer
 
@@ -59,6 +63,9 @@ async def lifespan(app: FastAPI):
     init_db()
     if os.getenv('FARO_SEED', '1') == '1':
         seed_demo_data()
+    stale = jobs.recover_stale_runs()
+    if stale:
+        print(f'· {stale} corridas interrumpidas marcadas como error')
     yield
 
 
@@ -305,6 +312,9 @@ async def estado(request: Request):
         checks=recientes,
         domains=domains,
         meili_online=meili.available,
+        runs=jobs.recent_runs(6),
+        running={kind: jobs.is_running(kind) for kind in ('crawl', 'health')},
+        crawl_mode=jobs.CRAWL_MODE,
     ))
 
 
@@ -470,6 +480,33 @@ async def sites_api(category: str = Query(default=''), limit: int = Query(defaul
     return {'total': len(sites), 'results': [site_to_dict(s) for s in sites]}
 
 
+@app.get('/api/status')
+async def status_api():
+    """Estado de las tareas del pipeline (para el panel y el worker)."""
+    runs = jobs.recent_runs(8)
+    return {
+        'mode': jobs.CRAWL_MODE,
+        'meilisearch': meili.available,
+        'running': {kind: jobs.is_running(kind) for kind in ('crawl', 'health', 'reindex')},
+        'runs': [{
+            'id': run.id,
+            'kind': run.kind,
+            'mode': run.mode,
+            'status': run.status,
+            'trigger': run.trigger,
+            'started_at': run.started_at.isoformat() if run.started_at else None,
+            'finished_at': run.finished_at.isoformat() if run.finished_at else None,
+            'duration': run.duration,
+            'pages_ok': run.pages_ok,
+            'pages_failed': run.pages_failed,
+            'sites_new': run.sites_new,
+            'blocked': run.blocked,
+            'checked': run.checked,
+            'message': run.message,
+        } for run in runs],
+    }
+
+
 @app.get('/health')
 async def health():
     return {
@@ -478,7 +515,9 @@ async def health():
         'version': APP_VERSION,
         'timestamp': datetime.utcnow().isoformat(),
         'meilisearch': meili.available,
-        'mode': CRAWL_MODE,
+        'mode': jobs.CRAWL_MODE,
+        'crawl_running': jobs.is_running('crawl'),
+        'health_running': jobs.is_running('health'),
     }
 
 
@@ -549,6 +588,8 @@ async def admin_dashboard(request: Request, _: bool = Depends(verify_admin)):
         )
         reportes_total = db.query(SiteReport).filter(SiteReport.status == 'pendiente').count()
         bloqueados = db.query(Blocklist).count()
+        ultimas = jobs.recent_runs(3)
+        running = {kind: jobs.is_running(kind) for kind in ('crawl', 'health')}
     return templates.TemplateResponse(request, 'admin_dashboard.html', ctx(
         request, nav='admin', admin_nav='dashboard', stats=stats,
         top=[site_to_dict(s) for s in top],
@@ -558,6 +599,9 @@ async def admin_dashboard(request: Request, _: bool = Depends(verify_admin)):
         pending_reports=pending_reports,
         bloqueados=bloqueados,
         meili_online=meili.available,
+        ultimas=ultimas,
+        running=running,
+        crawl_mode=jobs.CRAWL_MODE,
     ))
 
 
@@ -733,6 +777,7 @@ async def admin_report_action(
 async def admin_actions(
     request: Request,
     msg: str = Query(default=''),
+    anchor: str = Query(default=''),
     _: bool = Depends(verify_admin),
 ):
     with get_db() as db:
@@ -741,84 +786,96 @@ async def admin_actions(
             db.query(SiteReport).filter(SiteReport.status == 'pendiente').count()
         )
     return templates.TemplateResponse(request, 'admin_actions.html', ctx(
-        request, nav='admin', admin_nav='actions', stats=stats, message=msg or None,
-        meili_online=meili.available, pending_reports=pending_reports,
+        request, nav='admin', admin_nav='actions', message=msg or None,
+        anchor=anchor, **_jobs_context(request),
     ))
 
 
-def _refresh_health_demo(limit: int = 40):
-    """Chequeo de salud simulado sobre el índice (sin Tor)."""
-    import random
-    rng = random.Random(int(datetime.utcnow().timestamp()))
-    with SessionLocal() as db:
-        sites = db.query(OnionSite).filter(OnionSite.is_blocked.is_(False)).limit(limit).all()
-        for site in sites:
-            online = rng.random() < max(0.15, site.uptime_ratio)
-            latency = round(rng.uniform(0.3, 4.5), 2) if online else None
-            site.update_uptime(online, latency)
-            db.add(SiteCheck(
-                site_id=site.id, online=online, response_time=latency,
-                status_code=200 if online else 0,
-            ))
-        db.commit()
+def _jobs_context(request: Request) -> dict:
+    """Contexto común de las páginas de operación."""
+    with get_db() as db:
+        stats = global_stats(db, meili)
+        pending_reports = (
+            db.query(SiteReport).filter(SiteReport.status == 'pendiente').count()
+        )
+        seeds = db.query(CrawlSeed).order_by(
+            desc(CrawlSeed.active), desc(CrawlSeed.added_at)
+        ).all()
+    return {
+        'stats': stats,
+        'pending_reports': pending_reports,
+        'seeds': seeds,
+        'runs': jobs.recent_runs(10),
+        'running': {kind: jobs.is_running(kind) for kind in ('crawl', 'health', 'reindex')},
+        'crawl_mode': jobs.CRAWL_MODE,
+        'meili_online': meili.available,
+    }
 
 
-def _reindex():
-    with SessionLocal() as db:
-        sites = db.query(OnionSite).filter(OnionSite.is_blocked.is_(False)).all()
-        docs = [{
-            'url': s.url,
-            'title': s.title,
-            'description': s.description,
-            'content': s.content,
-            'content_hash': s.content_hash,
-            'category': s.category,
-            'crawled_at': (s.last_crawled or s.first_crawled).isoformat()
-            if (s.last_crawled or s.first_crawled) else None,
-        } for s in sites]
-        if docs:
-            meili.add_or_update_documents(docs)
+def _go(message: str, anchor: str = '') -> RedirectResponse:
+    url = '/admin/actions?msg=' + quote_plus(message)
+    if anchor:
+        url += '&anchor=' + anchor
+    return RedirectResponse(url=url, status_code=303)
 
 
 @app.post('/admin/actions/force-health-check')
-async def admin_force_health_check(
-    background: BackgroundTasks,
-    _: bool = Depends(verify_admin),
-):
-    background.add_task(_refresh_health_demo)
-    return RedirectResponse(
-        url='/admin/actions?msg=Chequeo+de+salud+iniciado+en+segundo+plano',
-        status_code=303,
-    )
+async def admin_force_health_check(_: bool = Depends(verify_admin)):
+    _started, _run_id, message = jobs.enqueue('health')
+    return _go(message)
 
 
 @app.post('/admin/actions/force-crawl')
-async def admin_force_crawl(
-    request: Request,
-    background: BackgroundTasks,
-    _: bool = Depends(verify_admin),
-):
-    if DEMO_MODE:
-        background.add_task(_refresh_health_demo)
-        msg = 'Modo demo: se refrescó la salud del índice (el rastreo real requiere Tor)'
-    else:
-        msg = 'Rastreo encolado: el crawler corre por el proxy Tor configurado'
-    return RedirectResponse(url='/admin/actions?msg=' + quote_plus(msg), status_code=303)
+async def admin_force_crawl(_: bool = Depends(verify_admin)):
+    _started, _run_id, message = jobs.enqueue('crawl')
+    return _go(message)
 
 
 @app.post('/admin/actions/reindex')
-async def admin_reindex(background: BackgroundTasks, _: bool = Depends(verify_admin)):
-    background.add_task(_reindex)
-    return RedirectResponse(
-        url='/admin/actions?msg=Reindexado+de+Meilisearch+en+segundo+plano',
-        status_code=303,
-    )
+async def admin_reindex(_: bool = Depends(verify_admin)):
+    _started, _run_id, message = jobs.enqueue('reindex')
+    return _go(message)
 
 
 @app.post('/admin/actions/seed')
 async def admin_seed(_: bool = Depends(verify_admin)):
     created = seed_demo_data()
-    return RedirectResponse(
-        url=f'/admin/actions?msg=Semilla+demo+cargada+({created}+nodos)',
-        status_code=303,
-    )
+    return _go(f'Semilla demo revisada ({created} nodos nuevos o actualizados)', 'semillas')
+
+
+@app.post('/admin/actions/seeds/add')
+async def admin_seed_add(
+    url: str = Form(...),
+    notes: str = Form(default=''),
+    _: bool = Depends(verify_admin),
+):
+    from crawler.transport import is_onion, normalize_url
+    candidate = normalize_url(url)
+    if not is_onion(candidate):
+        return _go('Dirección inválida: se espera un dominio .onion', 'semillas')
+    with get_db() as db:
+        if not db.query(CrawlSeed).filter(CrawlSeed.url == candidate).first():
+            db.add(CrawlSeed(url=candidate, notes=notes[:255] or None,
+                             source='manual'))
+            message = f'Semilla agregada: {transport_domain(candidate)[:16]}…'
+        else:
+            message = 'Esa semilla ya existe'
+    return _go(message, 'semillas')
+
+
+@app.post('/admin/actions/seeds/{seed_id}/toggle')
+async def admin_seed_toggle(seed_id: int, _: bool = Depends(verify_admin)):
+    with get_db() as db:
+        seed = db.query(CrawlSeed).filter(CrawlSeed.id == seed_id).first()
+        if seed:
+            seed.active = not seed.active
+    return _go('Semilla actualizada', 'semillas')
+
+
+@app.post('/admin/actions/seeds/{seed_id}/delete')
+async def admin_seed_delete(seed_id: int, _: bool = Depends(verify_admin)):
+    with get_db() as db:
+        seed = db.query(CrawlSeed).filter(CrawlSeed.id == seed_id).first()
+        if seed:
+            db.delete(seed)
+    return _go('Semilla eliminada', 'semillas')

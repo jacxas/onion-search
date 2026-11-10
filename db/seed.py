@@ -10,7 +10,7 @@ import hashlib
 from datetime import datetime, timedelta
 
 from db.database import get_db
-from db.models import OnionSite, SiteReport, Blocklist, SiteCheck
+from db.models import CrawlSeed, OnionSite, SiteReport, Blocklist, SiteCheck
 
 BASE32 = 'abcdefghijklmnopqrstuvwxyz234567'
 
@@ -181,6 +181,23 @@ def seed_demo_data(force: bool = False) -> int:
                     details=details,
                     status='pendiente',
                     created_at=now - timedelta(hours=6 + i * 13),
+                ))
+
+        if db.query(CrawlSeed).count() == 0:
+            # Hubs de arranque: en modo sim son nodos de la red simulada; en
+            # live, la lista real se define con TOR_SEED_URLS.
+            for slug, notes in [
+                ('faro-directorio', 'Directorio de nodos'),
+                ('plaza-foro', 'Foro general'),
+                ('wiki-onion', 'Wiki onion'),
+                ('mapa-onion', 'Mapa de la red'),
+                ('paste-negro', 'Pastebin'),
+            ]:
+                db.add(CrawlSeed(
+                    url=f'http://{onion_address(slug)}',
+                    source='demo',
+                    active=True,
+                    notes=notes,
                 ))
 
         if db.query(Blocklist).count() == 0:
