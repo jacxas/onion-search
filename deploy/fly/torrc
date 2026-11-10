@@ -1,0 +1,17 @@
+# Configuración de Tor para FARO en contenedor.
+# Salida a la red onion por SOCKS5 y publicación del portal como .onion.
+
+# Solo loopback: app y tor comparten contenedor.
+SocksPort 127.0.0.1:9050 IsolateSOCKSAuth
+ControlPort 0
+Log notice file /tmp/tor.log
+
+DataDirectory /var/lib/tor
+
+# Menos escrituras a disco (el contenedor es efímero salvo /var/lib/tor).
+AvoidDiskWrites 1
+
+# Servicio oculto v3 para el propio portal (nginx-less: directo a uvicorn).
+HiddenServiceDir /var/lib/tor/faro
+HiddenServicePort 80 127.0.0.1:3000
+HiddenServiceVersion 3

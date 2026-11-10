@@ -14,7 +14,34 @@ from contextlib import contextmanager
 from db.models import Base
 
 
-DATABASE_URL = os.getenv('DATABASE_URL') or 'sqlite:///./faro.db'
+def normalize_database_url(url: str) -> str:
+    """Deja la URL en una forma que SQLAlchemy reconozca.
+
+    Fly y otros PaaS entregan `postgres://…` (esquema de Heroku): SQLAlchemy
+    no lo mapea a ningún dialecto y falla en el primer connect. Se fuerza
+    `postgresql+psycopg2` explícito, que es el driver que instalamos.
+    """
+    url = (url or '').strip()
+    for prefix in ('postgres://', 'postgresql://'):
+        if url.startswith(prefix):
+            return 'postgresql+psycopg2://' + url[len(prefix):]
+    return url
+
+
+DATABASE_URL = normalize_database_url(os.getenv('DATABASE_URL'))
+ON_FLY = bool(os.getenv('FLY_APP_NAME'))
+
+# En un PaaS con disco efímero (Fly, Render, Railway…) caer a SQLite significa
+# perder el índice en cada reinicio. Mejor fallar temprano y con instrucciones
+# que arrancar "bien" y borrar datos en silencio.
+if not DATABASE_URL and ON_FLY:
+    raise RuntimeError(
+        'DATABASE_URL no está definida y FARO corre en Fly.io: el disco es '
+        'efímero y SQLite perdería el índice. Adjuntá Postgres '
+        '(fly mpg attach <db> --app <app>) o definí DATABASE_URL en [env].'
+    )
+
+DATABASE_URL = DATABASE_URL or 'sqlite:///./faro.db'
 IS_SQLITE = DATABASE_URL.startswith('sqlite')
 
 

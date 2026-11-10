@@ -70,6 +70,16 @@ scripts/worker.py      ciclo programado (salud 30 min / rastreo 3 h)
 - Rutas nuevas del panel: `nav='admin'`, `admin_nav='<sección>'` y
   `pending_reports` para el badge del menú.
 
+## Despliegue
+
+- `fly.toml` (raíz): dos grupos de proceso, `app` y `worker`, misma imagen.
+- `deploy/fly/Dockerfile.tor` + `entrypoint-tor.sh` + `torrc` + `fly.tor.toml`:
+  modo live con Tor dentro del contenedor y servicio oculto v3.
+- `db/database.py` normaliza `postgres://` → `postgresql+psycopg2://` (Fly lo
+  entrega así) y **aborta** si hay `FLY_APP_NAME` sin `DATABASE_URL`.
+- Si tocás un `COPY` de un Dockerfile, corré los tests: `test_config.py`
+  valida que el origen exista en el contexto y no esté en `.dockerignore`.
+
 ## Pruebas
 
 ```bash

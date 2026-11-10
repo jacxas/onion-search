@@ -132,7 +132,12 @@ Pruebas de humo:
 .venv/bin/python -m pytest tests -q
 ```
 
-## Despliegue (Docker + Tor)
+## Despliegue
+
+FARO es un proceso de larga vida con tareas en hilos y proxy Tor: **no** entra
+en un runtime serverless (Vercel, Netlify Functions). Necesita un contenedor.
+
+### Docker + Tor (VPS)
 
 ```bash
 docker compose up -d --build
@@ -140,9 +145,33 @@ docker compose exec tor cat /var/lib/tor/faro/hostname   # tu dirección .onion
 ```
 
 El compose levanta **app** (uvicorn), **db** (Postgres 17), **meili**
-(Meilisearch) y **tor** (proxy SOCKS5 + servicio oculto v3 hacia `app:3000`).
-Definí `ADMIN_TOKEN`, `TOR_SEED_URLS` y `FARO_SEED=0` antes de exponerlo.
-Para HTTPS dentro del onion, `SECURE_COOKIES=true`.
+(Meilisearch), **tor** (proxy SOCKS5 + servicio oculto v3 hacia `app:3000`) y
+**worker** (salud y rastreo programados). Definí `ADMIN_TOKEN`, `TOR_SEED_URLS`
+y `FARO_SEED=0` antes de exponerlo. Para HTTPS dentro del onion,
+`SECURE_COOKIES=true`.
+
+### Fly.io (PaaS)
+
+El repo trae `fly.toml` con **dos grupos de proceso** desde la misma imagen:
+`app` (HTTP público) y `worker` (tareas programadas), contra Postgres
+gestionado. En `sim` no hace falta Tor; para modo real hay una imagen
+alternativa con Tor integrado y servicio oculto v3.
+
+```bash
+fly apps create faro-onion
+fly mpg create --name faro-db --region gru
+fly mpg attach faro-db --app faro-onion
+fly secrets set ADMIN_TOKEN="$(openssl rand -hex 24)"
+fly deploy
+fly scale count app=1 worker=1
+```
+
+Paso a paso completo, variante con Tor, volumen para la clave del `.onion` y
+costos: **[deploy/fly/README.md](deploy/fly/README.md)**.
+
+En un PaaS con disco efímero FARO **exige** `DATABASE_URL`: si detecta
+`FLY_APP_NAME` sin base configurada aborta al arrancar en vez de usar SQLite y
+perder el índice en cada reinicio.
 
 ## Seguridad
 
@@ -169,6 +198,8 @@ crawler/pipeline.py        semillas → rastreo → dedupe/espejos → índice
 health_checker/checker.py  barrido de salud concurrente + SiteCheck
 backend/jobs.py            cola single-flight en hilos + progreso en CrawlRun
 scripts/worker.py          tareas programadas (salud / rastreo)
+fly.toml                   despliegue Fly.io (app + worker + Postgres)
+deploy/fly/                imagen con Tor, torrc, entrypoint y guía de deploy
 tests/                     pruebas de humo del portal
 scripts/start.sh           arranque local
 ```
