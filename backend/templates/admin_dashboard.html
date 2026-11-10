@@ -25,6 +25,36 @@
   <div class="stat"><div class="k">reportes pendientes</div><div class="v" style="color:var(--warn)">{{ reportes_total }}</div></div>
 </div>
 
+<div class="card" style="margin-top:20px">
+  <div class="spread" style="margin-bottom:10px">
+    <h2 class="mb-0">Pipeline</h2>
+    <div class="row">
+      {% if running.crawl %}<span class="badge pending">rastreando</span>{% endif %}
+      {% if running.health %}<span class="badge pending">verificando</span>{% endif %}
+      <span class="badge neutral">{{ crawl_mode }}</span>
+      <a class="btn btn-ghost btn-sm" href="/admin/actions">Operaciones</a>
+    </div>
+  </div>
+  {% if ultimas %}
+  <ul class="mini-list">
+    {% for run in ultimas %}
+    <li>
+      <span class="t">
+        {{ {'crawl':'Rastreo','health':'Salud','reindex':'Reindexado'}.get(run.kind, run.kind) }}
+        <small>{{ run.message or run.status }}</small>
+      </span>
+      <span class="nowrap">
+        <span class="badge {{ {'ok':'online','error':'offline','corriendo':'pending','pendiente':'neutral'}.get(run.status,'neutral') }}">{{ run.status }}</span>
+        <span class="muted small"> {{ run.duration }} s</span>
+      </span>
+    </li>
+    {% endfor %}
+  </ul>
+  {% else %}
+  <p class="small muted mb-0">Sin corridas registradas todavía.</p>
+  {% endif %}
+</div>
+
 <div class="cards-2" style="margin-top:20px">
   <div class="card">
     <h2>Mejor uptime</h2>

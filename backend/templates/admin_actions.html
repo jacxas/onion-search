@@ -1,60 +1,328 @@
 {% extends "admin_base.html" %}
-{% block admin_title %}Acciones{% endblock %}
+{% block admin_title %}Operaciones{% endblock %}
 
 {% block admin_content %}
 <div class="admin-head">
   <div>
-    <h1>Acciones de operación</h1>
-    <p class="small muted" style="margin:6px 0 0">Se ejecutan en segundo plano; recargá en unos segundos para ver el efecto.</p>
+    <h1>Operaciones</h1>
+    <p class="small muted" style="margin:6px 0 0">
+      Rastreo, salud y semillas · modo
+      <strong style="color:{{ 'var(--up)' if crawl_mode == 'live' else 'var(--warn)' }}">{{ crawl_mode }}</strong>
+      {% if crawl_mode == 'live' %}· tráfico por Tor{% else %}· red simulada{% endif %}
+    </p>
+  </div>
+  <div class="row">
+    <a class="btn btn-ghost btn-sm" href="/estado">Ver estado público</a>
+    <a class="btn btn-ghost btn-sm" href="/api/status" target="_blank" rel="noopener">/api/status</a>
   </div>
 </div>
 
 {% if message %}<div class="notice">{{ message }}</div>{% endif %}
+{% if anchor %}<script>window.location.hash = "{{ anchor }}";</script>{% endif %}
 
-{% if demo_mode %}
+{% if crawl_mode != 'live' %}
 <div class="notice warn">
-  <strong>Modo demo.</strong> No hay proxy Tor configurado, así que el «rastreo» se limita a
-  refrescar la salud del índice con datos sintéticos. Para crawl real definí
-  <code class="inline">CRAWL_MODE=live</code>, <code class="inline">TOR_SOCKS_PROXY</code> y semillas
-  <code class="inline">TOR_SEED_URLS</code>.
+  <strong>Modo simulación.</strong> El rastreo recorre una red onion determinista en memoria
+  (mismos dominios, contenidos y caídas en cada corrida) y la salud se verifica contra ella.
+  Para tráfico real: <code class="inline">CRAWL_MODE=live</code>,
+  <code class="inline">TOR_SOCKS_PROXY=socks5h://127.0.0.1:9050</code> y semillas reales.
 </div>
 {% endif %}
 
 <div class="cards-2">
   <div class="card">
-    <h2>Salud</h2>
-    <p class="small muted">Re-verifica disponibilidad y latencia de los nodos y actualiza uptime e historial.</p>
-    <form action="/admin/actions/force-health-check" method="post">
-      <button class="btn btn-primary btn-sm" type="submit">Ejecutar chequeo de salud</button>
+    <h2>Rastreo de semillas</h2>
+    <p class="small muted">
+      Sigue hasta 60 páginas, extrae enlaces hasta profundidad 2, deduplica por
+      huella de contenido y agrupa espejos.
+    </p>
+    <form action="/admin/actions/force-crawl" method="post">
+      <button class="btn btn-primary btn-sm" type="submit" {{ 'disabled' if running.crawl else '' }}>
+        {{ 'Rastreo en curso…' if running.crawl else 'Iniciar rastreo' }}
+      </button>
     </form>
+    {% if running.crawl %}<p class="small muted" style="margin:10px 0 0">Hay una corrida activa; se actualiza sola abajo.</p>{% endif %}
   </div>
 
   <div class="card">
-    <h2>Rastreo</h2>
-    <p class="small muted">Recorre semillas, extrae enlaces y agrega páginas nuevas al índice.</p>
-    <form action="/admin/actions/force-crawl" method="post">
-      <button class="btn btn-primary btn-sm" type="submit">Iniciar rastreo</button>
+    <h2>Chequeo de salud</h2>
+    <p class="small muted">
+      Verifica hasta 80 nodos con 8 hilos, actualiza uptime, latencia e historial
+      (<code class="inline">SiteCheck</code>).
+    </p>
+    <form action="/admin/actions/force-health-check" method="post">
+      <button class="btn btn-primary btn-sm" type="submit" {{ 'disabled' if running.health else '' }}>
+        {{ 'Verificando…' if running.health else 'Verificar ahora' }}
+      </button>
     </form>
   </div>
 
   <div class="card">
     <h2>Índice de búsqueda</h2>
     <p class="small muted">
-      Empuja todos los nodos a Meilisearch. Estado actual:
+      Meilisearch:
       <strong style="color:{{ 'var(--up)' if meili_online else 'var(--down)' }}">{{ 'disponible' if meili_online else 'no disponible' }}</strong>.
-      {% if not meili_online %}La búsqueda usa el motor local.{% endif %}
+      {% if not meili_online %}La búsqueda usa el motor local de la base.{% endif %}
     </p>
     <form action="/admin/actions/reindex" method="post">
-      <button class="btn btn-ghost btn-sm" type="submit">Reindexar</button>
+      <button class="btn btn-ghost btn-sm" type="submit" {{ 'disabled' if running.reindex else '' }}>Reindexar</button>
     </form>
   </div>
 
   <div class="card">
     <h2>Semilla de demostración</h2>
-    <p class="small muted">Carga el conjunto sintético de nodos, historial y reportes de ejemplo si faltan.</p>
+    <p class="small muted">Completa nodos, historial y reportes de ejemplo que falten. No duplica.</p>
     <form action="/admin/actions/seed" method="post">
-      <button class="btn btn-ghost btn-sm" type="submit">Cargar datos demo</button>
+      <button class="btn btn-ghost btn-sm" type="submit">Revisar semilla demo</button>
     </form>
   </div>
 </div>
+
+<section class="section" id="corridas">
+  <div class="section-head">
+    <h2>Corridas recientes</h2>
+    <span class="hint">
+      {% if running.crawl or running.health %}en curso · se actualiza cada 4 s{% else %}últimas 10 ejecuciones{% endif %}
+    </span>
+  </div>
+  {% if runs %}
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr><th>#</th><th>Tarea</th><th>Modo</th><th>Estado</th><th>Resultado</th><th>Duración</th><th>Disparo</th><th>Inicio</th></tr>
+      </thead>
+      <tbody>
+        {% for run in runs %}
+        <tr>
+          <td class="mono muted">{{ run.id }}</td>
+          <td><strong>{{ {'crawl':'Rastreo','health':'Salud','reindex':'Reindexado'}.get(run.kind, run.kind) }}</strong></td>
+          <td><span class="badge {{ 'neutral' }}">{{ run.mode }}</span></td>
+          <td>
+            <span class="badge {{ {'ok':'online','error':'offline','corriendo':'pending','pendiente':'neutral','cancelado':'neutral'}.get(run.status, 'neutral') }}">{{ run.status }}</span>
+          </td>
+          <td class="small">
+            {% if run.kind == 'crawl' %}
+              {{ run.pages_ok }} ok · {{ run.pages_failed }} fallos · {{ run.sites_new }} nuevos
+            {% elif run.kind == 'health' %}
+              {{ run.checked }} chequeados · {{ run.pages_ok }} en línea
+            {% else %}
+              {{ run.pages_ok }} documentos
+            {% endif %}
+            {% if run.message %}<br><span class="muted">{{ run.message }}</span>{% endif %}
+          </td>
+          <td class="nowrap">{{ run.duration }} s</td>
+          <td class="muted">{{ run.trigger }}</td>
+          <td class="nowrap muted">{{ run.started_at.strftime('%m-%d %H:%M') if run.started_at else '—' }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="empty">
+    <h3>Todavía no corrió nada</h3>
+    <p>Lanzá un rastreo o un chequeo de salud para poblar el índice con el pipeline real.</p>
+  </div>
+  {% endif %}
+</section>
+
+{% if running.crawl or running.health %}en curso · se actualiza cada 4 s{% else %}últimas 10 ejecuciones{% endif %}
+    </span>
+  </div>
+  {% if runs %}
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr><th>#</th><th>Tarea</th><th>Modo</th><th>Estado</th><th>Resultado</th><th>Duración</th><th>Disparo</th><th>Inicio</th></tr>
+      </thead>
+      <tbody>
+        {% for run in runs %}
+        <tr>
+          <td class="mono muted">{{ run.id }}</td>
+          <td><strong>{{ {'crawl':'Rastreo','health':'Salud','reindex':'Reindexado'}.get(run.kind, run.kind) }}</strong></td>
+          <td><span class="badge {{ 'neutral' }}">{{ run.mode }}</span></td>
+          <td>
+            <span class="badge {{ {'ok':'online','error':'offline','corriendo':'pending','pendiente':'neutral','cancelado':'neutral'}.get(run.status, 'neutral') }}">{{ run.status }}</span>
+          </td>
+          <td class="small">
+            {% if run.kind == 'crawl' %}
+              {{ run.pages_ok }} ok · {{ run.pages_failed }} fallos · {{ run.sites_new }} nuevos
+            {% elif run.kind == 'health' %}
+              {{ run.checked }} chequeados · {{ run.pages_ok }} en línea
+            {% else %}
+              {{ run.pages_ok }} documentos
+            {% endif %}
+            {% if run.message %}<br><span class="muted">{{ run.message }}</span>{% endif %}
+          </td>
+          <td class="nowrap">{{ run.duration }} s</td>
+          <td class="muted">{{ run.trigger }}</td>
+          <td class="nowrap muted">{{ run.started_at.strftime('%m-%d %H:%M') if run.started_at else '—' }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="empty">
+    <h3>Todavía no corrió nada</h3>
+    <p>Lanzá un rastreo o un chequeo de salud para poblar el índice con el pipeline real.</p>
+  </div>
+  {% endif %}
+</section>
+
+{% if running.crawl or running.health %}en curso · se actualiza cada 4 s{% else %}últimas 10 ejecuciones{% endif %}
+    </span>
+  </div>
+  {% if runs %}
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr><th>#</th><th>Tarea</th><th>Modo</th><th>Estado</th><th>Resultado</th><th>Duración</th><th>Disparo</th><th>Inicio</th></tr>
+      </thead>
+      <tbody>
+        {% for run in runs %}
+        <tr>
+          <td class="mono muted">{{ run.id }}</td>
+          <td><strong>{{ {'crawl':'Rastreo','health':'Salud','reindex':'Reindexado'}.get(run.kind, run.kind) }}</strong></td>
+          <td><span class="badge {{ 'neutral' }}">{{ run.mode }}</span></td>
+          <td>
+            <span class="badge {{ {'ok':'online','error':'offline','corriendo':'pending','pendiente':'neutral','cancelado':'neutral'}.get(run.status, 'neutral') }}">{{ run.status }}</span>
+          </td>
+          <td class="small">
+            {% if run.kind == 'crawl' %}
+              {{ run.pages_ok }} ok · {{ run.pages_failed }} fallos · {{ run.sites_new }} nuevos
+            {% elif run.kind == 'health' %}
+              {{ run.checked }} chequeados · {{ run.pages_ok }} en línea
+            {% else %}
+              {{ run.pages_ok }} documentos
+            {% endif %}
+            {% if run.message %}<br><span class="muted">{{ run.message }}</span>{% endif %}
+          </td>
+          <td class="nowrap">{{ run.duration }} s</td>
+          <td class="muted">{{ run.trigger }}</td>
+          <td class="nowrap muted">{{ run.started_at.strftime('%m-%d %H:%M') if run.started_at else '—' }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="empty">
+    <h3>Todavía no corrió nada</h3>
+    <p>Lanzá un rastreo o un chequeo de salud para poblar el índice con el pipeline real.</p>
+  </div>
+  {% endif %}
+</section>
+
+{% if running.crawl or running.health %}en curso · se actualiza cada 4 s{% else %}últimas 10 ejecuciones{% endif %}
+    </span>
+  </div>
+  {% if runs %}
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr><th>#</th><th>Tarea</th><th>Modo</th><th>Estado</th><th>Resultado</th><th>Duración</th><th>Disparo</th><th>Inicio</th></tr>
+      </thead>
+      <tbody>
+        {% for run in runs %}
+        <tr>
+          <td class="mono muted">{{ run.id }}</td>
+          <td><strong>{{ {'crawl':'Rastreo','health':'Salud','reindex':'Reindexado'}.get(run.kind, run.kind) }}</strong></td>
+          <td><span class="badge {{ 'neutral' }}">{{ run.mode }}</span></td>
+          <td>
+            <span class="badge {{ {'ok':'online','error':'offline','corriendo':'pending','pendiente':'neutral','cancelado':'neutral'}.get(run.status, 'neutral') }}">{{ run.status }}</span>
+          </td>
+          <td class="small">
+            {% if run.kind == 'crawl' %}
+              {{ run.pages_ok }} ok · {{ run.pages_failed }} fallos · {{ run.sites_new }} nuevos
+            {% elif run.kind == 'health' %}
+              {{ run.checked }} chequeados · {{ run.pages_ok }} en línea
+            {% else %}
+              {{ run.pages_ok }} documentos
+            {% endif %}
+            {% if run.message %}<br><span class="muted">{{ run.message }}</span>{% endif %}
+          </td>
+          <td class="nowrap">{{ run.duration }} s</td>
+          <td class="muted">{{ run.trigger }}</td>
+          <td class="nowrap muted">{{ run.started_at.strftime('%m-%d %H:%M') if run.started_at else '—' }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="empty">
+    <h3>Todavía no corrió nada</h3>
+    <p>Lanzá un rastreo o un chequeo de salud para poblar el índice con el pipeline real.</p>
+  </div>
+  {% endif %}
+</section>
+
+<section class="section" id="semillas">
+  <div class="section-head">
+    <h2>Semillas de rastreo</h2>
+    <span class="hint">{{ seeds|selectattr('active')|list|length }} activas de {{ seeds|length }}</span>
+  </div>
+
+  <div class="card" style="margin-bottom:16px">
+    <h2>Agregar semilla</h2>
+    <form class="row" action="/admin/actions/seeds/add" method="post" style="align-items:flex-end">
+      <div style="flex:2;min-width:260px">
+        <label class="field" for="seed-url">Dirección .onion (hub o nodo)</label>
+        <input class="input" id="seed-url" name="url" style="width:100%"
+               placeholder="abcdefghijklmnopqrstuvwxyz234567…onion" required>
+      </div>
+      <div style="flex:1;min-width:180px">
+        <label class="field" for="seed-notes">Nota</label>
+        <input class="input" id="seed-notes" name="notes" style="width:100%" placeholder="Directorio, foro, wiki…">
+      </div>
+      <button class="btn btn-primary" type="submit">Agregar</button>
+    </form>
+    <p class="small muted" style="margin:12px 0 0">
+      También se leen <code class="inline">TOR_SEED_URLS</code> y <code class="inline">seed_list.txt</code>
+      en cada corrida: esas fuentes no se pueden desactivar desde el panel.
+    </p>
+  </div>
+
+  {% if seeds %}
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Dirección</th><th>Origen</th><th>Nota</th><th>Activa</th><th>Último rastreo</th><th>Acciones</th></tr></thead>
+      <tbody>
+        {% for seed in seeds %}
+        <tr>
+          <td class="mono">{{ (seed.url | replace('http://',''))[:34] }}…</td>
+          <td>{{ seed.source }}</td>
+          <td class="muted">{{ seed.notes or '—' }}</td>
+          <td>
+            <span class="badge {{ 'online' if seed.active else 'neutral' }}">{{ 'sí' if seed.active else 'no' }}</span>
+          </td>
+          <td class="nowrap muted">{{ seed.last_crawled|timeago }}</td>
+          <td class="nowrap">
+            <form action="/admin/actions/seeds/{{ seed.id }}/toggle" method="post">
+              <button class="btn btn-ghost btn-sm" type="submit">{{ 'Pausar' if seed.active else 'Activar' }}</button>
+            </form>
+            <form action="/admin/actions/seeds/{{ seed.id }}/delete" method="post">
+              <button class="btn btn-danger btn-sm" type="submit">Quitar</button>
+            </form>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="empty">
+    <h3>Sin semillas</h3>
+    <p>Sin semillas activas no hay rastreo: agregá un hub .onion arriba o definí <code class="inline">TOR_SEED_URLS</code>.</p>
+  </div>
+  {% endif %}
+</section>
+
+{% if running.crawl or running.health %}
+<script>
+  // Refresco simple del estado de las corridas (sin dependencias externas).
+  setTimeout(function () { window.location.replace('/admin/actions#corridas'); }, 4000);
+</script>
+{% endif %}
 {% endblock %}

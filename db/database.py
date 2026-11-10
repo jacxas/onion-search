@@ -50,6 +50,9 @@ _ADDED_COLUMNS = {
         'language': 'VARCHAR(8)',
         'is_mirror': 'BOOLEAN DEFAULT 0',
     },
+    'site_reports': {
+        'status': "VARCHAR(16) DEFAULT 'pendiente'",
+    },
 }
 
 

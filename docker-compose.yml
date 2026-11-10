@@ -50,6 +50,26 @@ services:
       - "3000:3000"
     restart: on-failure
 
+  # Tareas programadas: salud cada 30 min y rastreo cada 3 h (usa Tor).
+  worker:
+    build: .
+    command: ["python", "-m", "scripts.worker"]
+    depends_on:
+      db:
+        condition: service_healthy
+      tor:
+        condition: service_started
+    environment:
+      DATABASE_URL: postgresql+psycopg2://faro:faro@db:5432/faro
+      CRAWL_MODE: live
+      TOR_SOCKS_PROXY: socks5h://tor:9050
+      MEILI_URL: http://meili:7700
+      MEILI_MASTER_KEY: dev-master-key
+      FARO_SEED: "0"
+      HEALTH_INTERVAL_MIN: "30"
+      CRAWL_INTERVAL_MIN: "180"
+    restart: on-failure
+
 volumes:
   pgdata:
   meilidata:

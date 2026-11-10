@@ -117,3 +117,57 @@ class SiteCheck(Base):
     online = Column(Boolean, default=False)
     response_time = Column(Float, nullable=True)
     status_code = Column(Integer, default=0)
+
+
+class CrawlSeed(Base):
+    """
+    Semilla de rastreo: punto de entrada .onion para el crawler.
+    """
+    __tablename__ = 'crawl_seeds'
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    url = Column(String(255), unique=True, nullable=False, index=True)
+    source = Column(String(32), nullable=False, default='manual')
+    active = Column(Boolean, default=True, nullable=False)
+    added_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    last_crawled = Column(DateTime, nullable=True)
+    notes = Column(String(255), nullable=True)
+
+    def __repr__(self):
+        return f"<CrawlSeed(url='{self.url[:40]}...', active={self.active})>"
+
+
+class CrawlRun(Base):
+    """
+    Ejecución de una tarea del pipeline (rastreo, salud, reindexado).
+
+    Se guarda en la base y no solo en memoria: el portal, el worker y el
+    panel pueden leer el progreso aunque corran en procesos distintos.
+    """
+    __tablename__ = 'crawl_runs'
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    kind = Column(String(16), nullable=False, default='crawl')       # crawl | health | reindex
+    mode = Column(String(8), nullable=False, default='sim')           # sim | live
+    status = Column(String(16), nullable=False, default='pendiente')  # pendiente | corriendo | ok | error | cancelado
+    trigger = Column(String(24), nullable=False, default='manual')    # manual | worker | boot
+    started_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    finished_at = Column(DateTime, nullable=True)
+    pages_ok = Column(Integer, default=0, nullable=False)
+    pages_failed = Column(Integer, default=0, nullable=False)
+    sites_new = Column(Integer, default=0, nullable=False)
+    blocked = Column(Integer, default=0, nullable=False)
+    checked = Column(Integer, default=0, nullable=False)
+    message = Column(Text, nullable=True)
+
+    @property
+    def duration(self):
+        end = self.finished_at or datetime.utcnow()
+        return max(0, int((end - self.started_at).total_seconds()))
+
+    @property
+    def running(self):
+        return self.status in ('pendiente', 'corriendo')
+
+    def __repr__(self):
+        return f"<CrawlRun({self.kind} {self.status} ok={self.pages_ok})>"

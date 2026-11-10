@@ -12,8 +12,11 @@ Base de datos vía SQLAlchemy (`db/`); **SQLite por defecto** (`./faro.db`, sin
 `DATABASE_URL`) y **PostgreSQL** en Docker. Meilisearch es opcional: si no
 responde, la búsqueda cae a un motor local (ver `backend/search.py`).
 
-El rastreo real (`crawler/`, `health_checker/`) necesita Tor y semillas; **no**
-se ejecuta en el preview. En su lugar corre la semilla demo (`db/seed.py`).
+El pipeline de rastreo y salud **sí está integrado**: se dispara desde
+`/admin/actions`, corre en un hilo (`backend/jobs.py`) y el progreso vive en la
+tabla `crawl_runs`. En el preview opera en modo `sim` contra
+`crawler/transport.py::SimTransport` (red determinista de 33 nodos, sin Tor).
+Con `CRAWL_MODE=live` el mismo pipeline sale por el proxy SOCKS5 de Tor.
 
 ## Arranque
 
@@ -23,6 +26,27 @@ bash scripts/start.sh            # :3000, health en /health
 
 `.base44/environment.json` apunta a ese script. `docker compose up -d --build`
 levanta app + Postgres + Meili + Tor.
+
+## Pipeline (resumen)
+
+```
+backend/jobs.py        enqueue(kind) → hilo + CrawlRun (single-flight)
+crawler/pipeline.py    semillas → fetch → parse → dedupe/espejos → DB/Meili
+crawler/transport.py   TorTransport | SimTransport (misma interfaz fetch())
+health_checker/checker.py  barrido con hilos → uptime + SiteCheck
+scripts/worker.py      ciclo programado (salud 30 min / rastreo 3 h)
+```
+
+- **Una fila por nodo**: `node_url()` colapsa cualquier ruta en `http://host`.
+  Nunca guardes URLs con path en `onion_sites`.
+- Las escrituras usan `get_db()` (commit al salir del contexto).
+  `with SessionLocal() as db` **no** commitea: no lo uses para escribir.
+- Si agregás un tipo de tarea, registralo en `jobs.JOBS` y en la UI de
+  `/admin/actions`.
+- En live hay preflight de Tor (`_tor_ready`): sin proxy la corrida termina con
+  error explicado, no con cientos de timeouts.
+- Tests del pipeline: `tests/test_pipeline.py` (transporte sim, dedupe,
+  blocklist, historial de salud).
 
 ## Credenciales locales (no son secretos)
 
