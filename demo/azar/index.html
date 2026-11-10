@@ -1,0 +1,17 @@
+<!DOCTYPE html>
+<html lang="es"><head><meta charset="utf-8">
+<meta http-equiv="refresh" content="4;url=/directorio">
+<title>FARO · nodo al azar</title>
+<link rel="stylesheet" href="/static/css/faro.css">
+</head><body><main class="wrap" style="padding-top:90px">
+<div class="empty"><h3>Buscando un nodo encendido…</h3>
+<p>Si no te lleva solo, abrí el <a href="/directorio">directorio</a>.</p></div>
+</main><script>
+(function(){
+  fetch('/static/sites.json').then(function(r){return r.json()}).then(function(list){
+    var up = list.filter(function(s){return s.online});
+    if (up.length) { location.replace('/sitio/' + up[Math.floor(Math.random()*up.length)].domain + '/'); }
+    else { location.replace('/directorio/'); }
+  }).catch(function(){ location.replace('/directorio/'); });
+})();
+</script></body></html>

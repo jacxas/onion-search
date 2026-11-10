@@ -1,0 +1,392 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="color-scheme" content="dark">
+  <meta name="description" content="FARO — buscador independiente de servicios .onion con verificación de disponibilidad.">
+  <meta name="referrer" content="no-referrer">
+  <title>FARO · buscador de servicios onion</title>
+  <link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
+  <link rel="stylesheet" href="/static/css/faro.css">
+  
+</head>
+<body><div class="demo-flag" style="border-top:1px solid rgba(255,196,92,.18)"><div class="wrap"><span class="badge pending">demo estática</span><span>Snapshot sin servidor de la interfaz de FARO: la búsqueda, los filtros y la paginación se resuelven en tu navegador con datos sintéticos. El portal completo (rastreo Tor, centro de mando, API en vivo) corre en Docker o Fly.io — <a href="https://github.com/jacxas/onion-search">código en GitHub</a>.</span></div></div>
+  <header class="site-header">
+    <div class="wrap">
+      <a class="brand" href="/" aria-label="FARO, inicio">
+        <svg class="brand-mark" viewBox="0 0 48 48" fill="none" aria-hidden="true">
+          <defs>
+            <linearGradient id="faro-beam" x1="24" y1="4" x2="24" y2="44" gradientUnits="userSpaceOnUse">
+              <stop stop-color="#ffd98a"/><stop offset="1" stop-color="#f0a020"/>
+            </linearGradient>
+          </defs>
+          <path d="M18 44h12l-2.2-20h-7.6L18 44Z" fill="url(#faro-beam)" opacity=".92"/>
+          <rect x="17.5" y="20.5" width="13" height="3.6" rx="1.2" fill="#0a0f15"/>
+          <rect x="19.5" y="9.5" width="9" height="11" rx="2" fill="#ffe6b0"/>
+          <path d="M24 3.5 25.6 8h-3.2L24 3.5Z" fill="#ffd98a"/>
+          <path d="M20 12.5 6 8.5M28 12.5 42 8.5M20 16.5 8 20M28 16.5 40 20"
+                stroke="#ffc45c" stroke-width="1.6" stroke-linecap="round" opacity=".6"/>
+          <path d="M13 40c4-1.6 8-2.4 11-2.4S31 38.4 35 40" stroke="#4fd1c5" stroke-width="1.6"
+                stroke-linecap="round" opacity=".7"/>
+        </svg>
+        <span>
+          <span class="brand-name">FARO</span><br>
+          <span class="brand-tag">buscador onion</span>
+        </span>
+      </a>
+
+      <nav class="nav" aria-label="Navegación principal">
+        <a href="/" class="active">Inicio</a>
+        <a href="/search" class="">Buscar</a>
+        <a href="/directorio" class="">Directorio</a>
+        <a href="/estado" class=""><span class="dot"></span>Estado</a>
+        <a href="/api" class="">API</a>
+        <a href="/admin" class="">Panel</a>
+      </nav>
+    </div>
+  </header>
+
+  
+  <div class="demo-flag">
+    <div class="wrap">
+      <span class="badge pending">modo demo</span>
+      <span>Índice de demostración con datos sintéticos. El rastreo real requiere Tor:
+      <code>CRAWL_MODE=live</code> + <code>TOR_SOCKS_PROXY</code>.</span>
+    </div>
+  </div>
+  
+
+  <main>
+    
+<div class="wrap">
+
+  
+  <section class="hero">
+    <h1>Encontrá lo que la red<br><em>todavía alumbra</em></h1>
+    <p class="lede">
+      FARO indexa servicios <span class="mono">.onion</span> y verifica su salud de forma
+      continua. Antes de abrir un nodo, mirá cuándo respondió por última vez.
+    </p>
+
+    <form class="search-shell" action="/search" method="get" role="search">
+      <div class="search-row">
+        <div class="search-input-wrap">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+            <circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5" stroke-linecap="round"/>
+          </svg>
+          <input class="search-input" type="search" name="q" placeholder="Bibliotecas, foros, correo cifrado…" autofocus autocomplete="off">
+        </div>
+        <button class="btn btn-primary" type="submit">Encender faro</button>
+      </div>
+      <div class="search-chips">
+        <span class="label">Atajos</span>
+        
+        <a class="chip" href="/search?q=biblioteca">Biblioteca</a>
+        
+        <a class="chip" href="/search?q=foro">Foro</a>
+        
+        <a class="chip" href="/search?q=correo">Correo</a>
+        
+        <a class="chip" href="/search?q=herramientas">Herramientas</a>
+        
+        <a class="chip" href="/search?q=noticias">Noticias</a>
+        
+        <a class="chip" href="/azar" title="Nodo en línea al azar">al azar ↗</a>
+      </div>
+    </form>
+
+    <div class="stats-strip">
+      <div class="stat"><div class="k">nodos indexados</div><div class="v">27</div></div>
+      <div class="stat"><div class="k">en línea ahora</div><div class="v" style="color:var(--up)">23</div></div>
+      <div class="stat"><div class="k">uptime medio</div><div class="v">86<small>%</small></div></div>
+      <div class="stat"><div class="k">latencia media</div><div class="v">1.89<small> s</small></div></div>
+      <div class="stat"><div class="k">último barrido</div><div class="v" style="font-size:1.05rem;padding-top:6px">hace 12 min</div></div>
+    </div>
+  </section>
+
+  
+  <section class="section">
+    <div class="section-head">
+      <h2>Nodos mejor señalados</h2>
+      <span class="hint">ordenados por disponibilidad verificada</span>
+    </div>
+    <div class="result-list">
+      <a class="result" href="/sitio/4ytj3yktsjqpxcot3lwvpopwtkp6uzc34ytj3yktsjqpxcot3lwvpopw.onion">
+  <h3>La Plaza · foro general</h3>
+  <div class="url">4ytj3yktsjqpxcot3lwvpopwtkp6uzc34ytj3yktsjqpxcot3lwvpopw.onion</div>
+  <p class="desc">Foro de discusión general sobre privacidad, criptografía aplicada y cultura de la red Tor. Registro abierto.</p>
+  <div class="meta">
+    <span class="badge online">
+      <span class="dot-up"></span>
+      en línea
+    </span>
+    <span class="badge cat">Foros</span>
+    
+    <span><span class="uptime">
+  <span class="uptime-bar"><span style="width: 99%"></span></span>
+  99%
+</span></span>
+    <span>0.75 s</span>
+    <span>verificado hace 19 min</span>
+  </div>
+</a><a class="result" href="/sitio/7jepzuzyx63jlvhltzwe2e4zox2fmn6p7jepzuzyx63jlvhltzwe2e4z.onion">
+  <h3>Biblioteca Sombra</h3>
+  <div class="url">7jepzuzyx63jlvhltzwe2e4zox2fmn6p7jepzuzyx63jlvhltzwe2e4z.onion</div>
+  <p class="desc">Archivo de textos sobre vigilancia, criptografía y libertad de expresión. Descargas en PDF y EPUB.</p>
+  <div class="meta">
+    <span class="badge online">
+      <span class="dot-up"></span>
+      en línea
+    </span>
+    <span class="badge cat">Biblioteca</span>
+    
+    <span><span class="uptime">
+  <span class="uptime-bar"><span style="width: 98%"></span></span>
+  98%
+</span></span>
+    <span>1.10 s</span>
+    <span>verificado hace 26 min</span>
+  </div>
+</a><a class="result" href="/sitio/db5tkklbyqcwvv35eu4lhbqv4vxeaa5hdb5tkklbyqcwvv35eu4lhbqv.onion">
+  <h3>Mercado Verde</h3>
+  <div class="url">db5tkklbyqcwvv35eu4lhbqv4vxeaa5hdb5tkklbyqcwvv35eu4lhbqv.onion</div>
+  <p class="desc">Mercado de semillas y plantas raras. Reputación pública, escrow y envíos discrecionales.</p>
+  <div class="meta">
+    <span class="badge online">
+      <span class="dot-up"></span>
+      en línea
+    </span>
+    <span class="badge cat">Mercados</span>
+    
+    <span><span class="uptime">
+  <span class="uptime-bar"><span style="width: 97%"></span></span>
+  97%
+</span></span>
+    <span>1.45 s</span>
+    <span>verificado hace 33 min</span>
+  </div>
+</a><a class="result" href="/sitio/y3htvf4ogc3ppocfsg2a4iibuuy63h33y3htvf4ogc3ppocfsg2a4iib.onion">
+  <h3>Buzón Cifrado</h3>
+  <div class="url">y3htvf4ogc3ppocfsg2a4iibuuy63h33y3htvf4ogc3ppocfsg2a4iib.onion</div>
+  <p class="desc">Servicio de correo descartable con cifrado PGP obligatorio. Sin registro ni logs de IP.</p>
+  <div class="meta">
+    <span class="badge online">
+      <span class="dot-up"></span>
+      en línea
+    </span>
+    <span class="badge cat">Correo</span>
+    
+    <span><span class="uptime">
+  <span class="uptime-bar"><span style="width: 96%"></span></span>
+  96%
+</span></span>
+    <span>1.80 s</span>
+    <span>verificado hace 40 min</span>
+  </div>
+</a><a class="result" href="/sitio/67o4hsggfrjwqnbbfbjxbfwpbd5gmv4x67o4hsggfrjwqnbbfbjxbfwp.onion">
+  <h3>Noticias Trincheras</h3>
+  <div class="url">67o4hsggfrjwqnbbfbjxbfwpbd5gmv4x67o4hsggfrjwqnbbfbjxbfwp.onion</div>
+  <p class="desc">Boletín independiente con cobertura de filtraciones y casos de censura. Publicación semanal.</p>
+  <div class="meta">
+    <span class="badge online">
+      <span class="dot-up"></span>
+      en línea
+    </span>
+    <span class="badge cat">Noticias</span>
+    
+    <span><span class="uptime">
+  <span class="uptime-bar"><span style="width: 95%"></span></span>
+  95%
+</span></span>
+    <span>2.15 s</span>
+    <span>verificado hace 47 min</span>
+  </div>
+</a><a class="result" href="/sitio/c4ogaso3f25ylvgcsw55tb4j4k32r3hic4ogaso3f25ylvgcsw55tb4j.onion">
+  <h3>Paste Negro</h3>
+  <div class="url">c4ogaso3f25ylvgcsw55tb4j4k32r3hic4ogaso3f25ylvgcsw55tb4j.onion</div>
+  <p class="desc">Pegbin anónimo con caducidad de 24 h, sintaxis resaltada y subida de archivos hasta 5 MB.</p>
+  <div class="meta">
+    <span class="badge online">
+      <span class="dot-up"></span>
+      en línea
+    </span>
+    <span class="badge cat">Herramientas</span>
+    
+    <span><span class="uptime">
+  <span class="uptime-bar"><span style="width: 94%"></span></span>
+  94%
+</span></span>
+    <span>2.50 s</span>
+    <span>verificado hace 54 min</span>
+  </div>
+</a>
+    </div>
+  </section>
+  
+
+  <div class="layout">
+    <section class="section" style="margin-top:0">
+      <div class="section-head">
+        <h2>Explorar por categoría</h2>
+        <a class="hint" href="/directorio">ver directorio completo →</a>
+      </div>
+      <div class="cards-2">
+        
+        <a class="card" href="/search?category=Biblioteca" style="color:inherit">
+          <div class="spread">
+            <strong style="color:#fff">Biblioteca</strong>
+            <span class="mono muted">5</span>
+          </div>
+          <p class="small muted" style="margin:8px 0 0">
+            5 nodos con verificación de uptime.
+          </p>
+        </a>
+        
+        <a class="card" href="/search?category=Servicios" style="color:inherit">
+          <div class="spread">
+            <strong style="color:#fff">Servicios</strong>
+            <span class="mono muted">4</span>
+          </div>
+          <p class="small muted" style="margin:8px 0 0">
+            4 nodos con verificación de uptime.
+          </p>
+        </a>
+        
+        <a class="card" href="/search?category=Mercados" style="color:inherit">
+          <div class="spread">
+            <strong style="color:#fff">Mercados</strong>
+            <span class="mono muted">4</span>
+          </div>
+          <p class="small muted" style="margin:8px 0 0">
+            4 nodos con verificación de uptime.
+          </p>
+        </a>
+        
+        <a class="card" href="/search?category=Herramientas" style="color:inherit">
+          <div class="spread">
+            <strong style="color:#fff">Herramientas</strong>
+            <span class="mono muted">4</span>
+          </div>
+          <p class="small muted" style="margin:8px 0 0">
+            4 nodos con verificación de uptime.
+          </p>
+        </a>
+        
+      </div>
+    </section>
+
+    <aside class="side">
+      <div class="panel">
+        <h3>Categorías</h3>
+        <ul>
+          
+          <li><a class="cat-link" href="/search?category=Biblioteca">Biblioteca<span class="n">5</span></a></li>
+          
+          <li><a class="cat-link" href="/search?category=Servicios">Servicios<span class="n">4</span></a></li>
+          
+          <li><a class="cat-link" href="/search?category=Mercados">Mercados<span class="n">4</span></a></li>
+          
+          <li><a class="cat-link" href="/search?category=Herramientas">Herramientas<span class="n">4</span></a></li>
+          
+          <li><a class="cat-link" href="/search?category=Foros">Foros<span class="n">4</span></a></li>
+          
+          <li><a class="cat-link" href="/search?category=Seguridad">Seguridad<span class="n">2</span></a></li>
+          
+          <li><a class="cat-link" href="/search?category=Noticias">Noticias<span class="n">2</span></a></li>
+          
+          <li><a class="cat-link" href="/search?category=Correo">Correo<span class="n">1</span></a></li>
+          
+          <li><a class="cat-link" href="/search?category=Blog">Blog<span class="n">1</span></a></li>
+          
+        </ul>
+      </div>
+      <div class="panel">
+        <h3>Últimas verificaciones</h3>
+        <ul class="mini-list">
+          
+          <li>
+            <span class="t">Faro · Directorio de nodos<small>ll4lu23g5tigzf45fr…</small></span>
+            <span class="badge online">ok</span>
+          </li>
+          
+          <li>
+            <span class="t">Chat Libre<small>4cclufflwz4blaidul…</small></span>
+            <span class="badge online">ok</span>
+          </li>
+          
+          <li>
+            <span class="t">Clínica Abierta<small>zwhbkpnlq2r2wyq6zy…</small></span>
+            <span class="badge online">ok</span>
+          </li>
+          
+          <li>
+            <span class="t">La Plaza · foro general (espejo)<small>zlbuur7dmdqxme7yjp…</small></span>
+            <span class="badge online">ok</span>
+          </li>
+          
+          <li>
+            <span class="t">La Plaza · foro general<small>4ytj3yktsjqpxcot3l…</small></span>
+            <span class="badge online">ok</span>
+          </li>
+          
+        </ul>
+      </div>
+      <div class="panel">
+        <h3>Cómo leer el índice</h3>
+        <p class="small muted" style="margin:0 0 10px">
+          El uptime sale de los últimos 100 chequeos. Un nodo con menos de 60 %
+          suele estar intermitente: reintentá más tarde.
+        </p>
+        <a class="btn btn-ghost btn-sm" href="/estado">Ver estado de la red</a>
+      </div>
+    </aside>
+  </div>
+
+  
+</div>
+
+  </main>
+
+  <footer class="site-footer">
+    <div class="wrap">
+      <div>
+        <div class="brand" style="margin-bottom:10px">
+          <svg class="brand-mark" viewBox="0 0 48 48" fill="none" aria-hidden="true">
+            <path d="M18 44h12l-2.2-20h-7.6L18 44Z" fill="#f0a020" opacity=".9"/>
+            <rect x="19.5" y="9.5" width="9" height="11" rx="2" fill="#ffe6b0"/>
+            <path d="M20 12.5 8 9M28 12.5 40 9" stroke="#ffc45c" stroke-width="1.6" stroke-linecap="round" opacity=".55"/>
+          </svg>
+          <span class="brand-name" style="font-size:1.05rem">FARO</span>
+        </div>
+        <p style="margin:0;max-width:330px">
+          Buscador independiente de servicios <span class="mono">.onion</span>.
+          Sin anuncios, sin rastreo, sin recursos de terceros.
+        </p>
+        <p class="small" style="margin:12px 0 0">v1.0.0 · modo demo</p>
+      </div>
+      <div class="foot-cols">
+        <div class="foot-col">
+          <h4>Portal</h4>
+          <a href="/search">Búsqueda</a>
+          <a href="/directorio">Directorio</a>
+          <a href="/estado">Estado de la red</a>
+          <a href="/azar">Nodo al azar</a>
+        </div>
+        <div class="foot-col">
+          <h4>Desarrolladores</h4>
+          <a href="/api">API pública</a>
+          <a href="/api/stats">/api/stats</a>
+          <a href="/health">/health</a>
+        </div>
+        <div class="foot-col">
+          <h4>Operación</h4>
+          <a href="/admin">Centro de mando</a>
+          <a href="/admin/reports">Reportes</a>
+          <a href="/admin/blocklist">Blocklist</a>
+        </div>
+      </div>
+    </div>
+  </footer>
+<script src="/static/demo.js" defer></script></body>
+</html>

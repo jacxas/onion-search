@@ -1,0 +1,42 @@
+# FARO — demo estática para Netlify
+#
+# El portal real (backend/main.py) es una app FastAPI con base de datos,
+# crawler y proxy Tor: NO puede correr en un hosting estático. Para el portal
+# completo usá Docker (docker-compose.yml) o Fly.io (fly.toml + deploy/fly/README.md).
+#
+# Esta configuración publica el snapshot estático del portal (modo demo,
+# datos sintéticos) generado con: node _snapshot_demo.mjs  (repo corriendo
+# en local con CRAWL_MODE=sim, por ej. uvicorn backend.main:app --port 3007).
+# La búsqueda, los filtros y la paginación se resuelven en el navegador con
+# static/demo.js + static/sites.json.
+
+[build]
+  publish = "demo"
+
+# Las fichas de nodo usan carpetas con extensión .onion: sin esta regla
+# Netlify no resuelve /sitio/<host>.onion como índice de directorio.
+[[redirects]]
+  from = "/sitio/:domain"
+  to = "/sitio/:domain/index.html"
+  status = 200
+
+# Snapshots JSON de la API pública (ejemplos fijos de la corrida demo)
+[[redirects]]
+  from = "/api/stats"
+  to = "/api/stats.json"
+  status = 200
+
+[[redirects]]
+  from = "/api/status"
+  to = "/api/status.json"
+  status = 200
+
+[[redirects]]
+  from = "/api/search"
+  to = "/api/search.json"
+  status = 200
+
+[[redirects]]
+  from = "/health"
+  to = "/health.json"
+  status = 200

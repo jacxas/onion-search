@@ -1,0 +1,360 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="color-scheme" content="dark">
+  <meta name="description" content="FARO — buscador independiente de servicios .onion con verificación de disponibilidad.">
+  <meta name="referrer" content="no-referrer">
+  <title>Estado de la red · FARO</title>
+  <link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
+  <link rel="stylesheet" href="/static/css/faro.css">
+  
+</head>
+<body><div class="demo-flag" style="border-top:1px solid rgba(255,196,92,.18)"><div class="wrap"><span class="badge pending">demo estática</span><span>Snapshot sin servidor de la interfaz de FARO: la búsqueda, los filtros y la paginación se resuelven en tu navegador con datos sintéticos. El portal completo (rastreo Tor, centro de mando, API en vivo) corre en Docker o Fly.io — <a href="https://github.com/jacxas/onion-search">código en GitHub</a>.</span></div></div>
+  <header class="site-header">
+    <div class="wrap">
+      <a class="brand" href="/" aria-label="FARO, inicio">
+        <svg class="brand-mark" viewBox="0 0 48 48" fill="none" aria-hidden="true">
+          <defs>
+            <linearGradient id="faro-beam" x1="24" y1="4" x2="24" y2="44" gradientUnits="userSpaceOnUse">
+              <stop stop-color="#ffd98a"/><stop offset="1" stop-color="#f0a020"/>
+            </linearGradient>
+          </defs>
+          <path d="M18 44h12l-2.2-20h-7.6L18 44Z" fill="url(#faro-beam)" opacity=".92"/>
+          <rect x="17.5" y="20.5" width="13" height="3.6" rx="1.2" fill="#0a0f15"/>
+          <rect x="19.5" y="9.5" width="9" height="11" rx="2" fill="#ffe6b0"/>
+          <path d="M24 3.5 25.6 8h-3.2L24 3.5Z" fill="#ffd98a"/>
+          <path d="M20 12.5 6 8.5M28 12.5 42 8.5M20 16.5 8 20M28 16.5 40 20"
+                stroke="#ffc45c" stroke-width="1.6" stroke-linecap="round" opacity=".6"/>
+          <path d="M13 40c4-1.6 8-2.4 11-2.4S31 38.4 35 40" stroke="#4fd1c5" stroke-width="1.6"
+                stroke-linecap="round" opacity=".7"/>
+        </svg>
+        <span>
+          <span class="brand-name">FARO</span><br>
+          <span class="brand-tag">buscador onion</span>
+        </span>
+      </a>
+
+      <nav class="nav" aria-label="Navegación principal">
+        <a href="/" class="">Inicio</a>
+        <a href="/search" class="">Buscar</a>
+        <a href="/directorio" class="">Directorio</a>
+        <a href="/estado" class="active"><span class="dot"></span>Estado</a>
+        <a href="/api" class="">API</a>
+        <a href="/admin" class="">Panel</a>
+      </nav>
+    </div>
+  </header>
+
+  
+  <div class="demo-flag">
+    <div class="wrap">
+      <span class="badge pending">modo demo</span>
+      <span>Índice de demostración con datos sintéticos. El rastreo real requiere Tor:
+      <code>CRAWL_MODE=live</code> + <code>TOR_SOCKS_PROXY</code>.</span>
+    </div>
+  </div>
+  
+
+  <main>
+    
+<div class="wrap">
+  <section class="hero" style="padding-bottom:8px">
+    <h1 style="font-size:clamp(1.7rem,4vw,2.4rem)">Estado <em>de la red</em></h1>
+    <p class="lede" style="margin-bottom:0">
+      Salud agregada del índice, incidentes abiertos y los nodos que responden más lento.
+      Se actualiza en cada barrido de verificación.
+    </p>
+  </section>
+
+  <div class="stats-strip">
+    <div class="stat"><div class="k">nodos</div><div class="v">27</div></div>
+    <div class="stat"><div class="k">en línea</div><div class="v" style="color:var(--up)">23</div></div>
+    <div class="stat"><div class="k">caídos</div><div class="v" style="color:var(--down)">4</div></div>
+    <div class="stat"><div class="k">uptime medio</div><div class="v">86<small>%</small></div></div>
+    <div class="stat"><div class="k">motor</div><div class="v" style="font-size:1rem;padding-top:8px">local</div></div>
+    <div class="stat"><div class="k">último chequeo</div><div class="v" style="font-size:1rem;padding-top:8px">hace 12 min</div></div>
+  </div>
+
+  <div class="card" style="margin-bottom:24px">
+    <div class="spread" style="margin-bottom:12px">
+      <h2 class="mb-0">Pipeline</h2>
+      <span class="hint">
+        modo <strong>sim</strong>
+        
+        
+      </span>
+    </div>
+    
+    <p class="small muted mb-0">El pipeline todavía no corrió. Podés lanzarlo desde el <a href="/admin/actions">centro de mando</a>.</p>
+    
+  </div>
+
+  <div class="layout">
+    <div>
+      <section class="section" style="margin-top:0">
+        <div class="section-head"><h2>Incidentes abiertos</h2><span class="hint">4 nodos sin respuesta</span></div>
+        
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Servicio</th><th>Dirección</th><th>Uptime</th><th>Último intento</th></tr></thead>
+            <tbody>
+              
+              <tr>
+                <td><a href="/sitio/qzzhu36if5utghinktewoqxtspucdxbfqzzhu36if5utghinktewoqxt.onion"><strong>Radio Fantasma</strong></a></td>
+                <td class="mono">qzzhu36if5utghinktewoqxt…</td>
+                <td>0%</td>
+                <td class="muted">hace 34 min</td>
+              </tr>
+              
+              <tr>
+                <td><a href="/sitio/gc5ginh7k3xaur66qgvfo4bea6g33ldagc5ginh7k3xaur66qgvfo4be.onion"><strong>Contratapa</strong></a></td>
+                <td class="mono">gc5ginh7k3xaur66qgvfo4be…</td>
+                <td>0%</td>
+                <td class="muted">hace 35 min</td>
+              </tr>
+              
+              <tr>
+                <td><a href="/sitio/jxlmaafkpad3jvcoh2h5gh5pdilkrhyzjxlmaafkpad3jvcoh2h5gh5p.onion"><strong>Ferramenta</strong></a></td>
+                <td class="mono">jxlmaafkpad3jvcoh2h5gh5p…</td>
+                <td>0%</td>
+                <td class="muted">hace 42 min</td>
+              </tr>
+              
+              <tr>
+                <td><a href="/sitio/byfsmyuwtvth4x2dct5isrji65ic7o5xbyfsmyuwtvth4x2dct5isrji.onion"><strong>Tienda de Libros Raros</strong></a></td>
+                <td class="mono">byfsmyuwtvth4x2dct5isrji…</td>
+                <td>0%</td>
+                <td class="muted">hace 55 min</td>
+              </tr>
+              
+            </tbody>
+          </table>
+        </div>
+        
+      </section>
+
+      <section class="section">
+        <div class="section-head"><h2>Respuestas más lentas</h2><span class="hint">latencia media en segundos</span></div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Servicio</th><th>Categoría</th><th>Latencia</th><th></th></tr></thead>
+            <tbody>
+              
+              <tr>
+                <td><a href="/sitio/4cclufflwz4blaidulk6px36fsalaucx4cclufflwz4blaidulk6px36.onion"><strong>Chat Libre</strong></a></td>
+                <td>Servicios</td>
+                <td class="nowrap">3.20 s</td>
+                <td class="muted small">tor es lento por diseño</td>
+              </tr>
+              
+              <tr>
+                <td><a href="/sitio/s2rpwlh5dag7h4lik25ntyvmrcj2jgyas2rpwlh5dag7h4lik25ntyvm.onion"><strong>Glosario Tor</strong></a></td>
+                <td>Biblioteca</td>
+                <td class="nowrap">3.20 s</td>
+                <td class="muted small">tor es lento por diseño</td>
+              </tr>
+              
+              <tr>
+                <td><a href="/sitio/eebz646kc5dux32q4ifa7f3zv7u6s6kqeebz646kc5dux32q4ifa7f3z.onion"><strong>Wiki Onion (espejo)</strong></a></td>
+                <td>Biblioteca</td>
+                <td class="nowrap">3.20 s</td>
+                <td class="muted small">tor es lento por diseño</td>
+              </tr>
+              
+              <tr>
+                <td><a href="/sitio/uyoh3hgoha2yuatkhedwy6yvpo7m26xquyoh3hgoha2yuatkhedwy6yv.onion"><strong>Wiki Onion</strong></a></td>
+                <td>Biblioteca</td>
+                <td class="nowrap">2.85 s</td>
+                <td class="muted small">tor es lento por diseño</td>
+              </tr>
+              
+              <tr>
+                <td><a href="/sitio/zwhbkpnlq2r2wyq6zywtsbgrpbdc5mlrzwhbkpnlq2r2wyq6zywtsbgr.onion"><strong>Clínica Abierta</strong></a></td>
+                <td>Servicios</td>
+                <td class="nowrap">2.85 s</td>
+                <td class="muted small">tor es lento por diseño</td>
+              </tr>
+              
+              <tr>
+                <td><a href="/sitio/msfjz342lvbbkhmnezzipforjqj4t6tlmsfjz342lvbbkhmnezzipfor.onion"><strong>Mercado Verde (espejo)</strong></a></td>
+                <td>Mercados</td>
+                <td class="nowrap">2.85 s</td>
+                <td class="muted small">tor es lento por diseño</td>
+              </tr>
+              
+            </tbody>
+          </table>
+        </div>
+      </section>
+    </div>
+
+    <aside class="side">
+      <div class="panel">
+        <h3>Últimos chequeos</h3>
+        <ul class="mini-list">
+          
+          <li>
+            <span class="t mono">ll4lu23g5tigzf45…
+              <small>11-10 22:29</small>
+            </span>
+            <span class="badge online">ok</span>
+          </li>
+          
+          <li>
+            <span class="t mono">4ytj3yktsjqpxcot…
+              <small>11-10 22:29</small>
+            </span>
+            <span class="badge online">ok</span>
+          </li>
+          
+          <li>
+            <span class="t mono">7jepzuzyx63jlvhl…
+              <small>11-10 22:29</small>
+            </span>
+            <span class="badge online">ok</span>
+          </li>
+          
+          <li>
+            <span class="t mono">db5tkklbyqcwvv35…
+              <small>11-10 22:29</small>
+            </span>
+            <span class="badge online">ok</span>
+          </li>
+          
+          <li>
+            <span class="t mono">y3htvf4ogc3ppocf…
+              <small>11-10 22:29</small>
+            </span>
+            <span class="badge online">ok</span>
+          </li>
+          
+          <li>
+            <span class="t mono">67o4hsggfrjwqnbb…
+              <small>11-10 22:29</small>
+            </span>
+            <span class="badge online">ok</span>
+          </li>
+          
+          <li>
+            <span class="t mono">c4ogaso3f25ylvgc…
+              <small>11-10 22:29</small>
+            </span>
+            <span class="badge online">ok</span>
+          </li>
+          
+          <li>
+            <span class="t mono">uyoh3hgoha2yuatk…
+              <small>11-10 22:29</small>
+            </span>
+            <span class="badge online">ok</span>
+          </li>
+          
+          <li>
+            <span class="t mono">4cclufflwz4blaid…
+              <small>11-10 22:29</small>
+            </span>
+            <span class="badge online">ok</span>
+          </li>
+          
+          <li>
+            <span class="t mono">m5p2kkoeii2dljoq…
+              <small>11-10 22:29</small>
+            </span>
+            <span class="badge online">ok</span>
+          </li>
+          
+          <li>
+            <span class="t mono">icqmjbq7eqk2y3h2…
+              <small>11-10 22:29</small>
+            </span>
+            <span class="badge online">ok</span>
+          </li>
+          
+          <li>
+            <span class="t mono">qzzhu36if5utghin…
+              <small>11-10 22:29</small>
+            </span>
+            <span class="badge offline">timeout</span>
+          </li>
+          
+          <li>
+            <span class="t mono">23w6v2zedhtcknhl…
+              <small>11-10 22:29</small>
+            </span>
+            <span class="badge online">ok</span>
+          </li>
+          
+          <li>
+            <span class="t mono">savbqmcbs3sb7dhh…
+              <small>11-10 22:29</small>
+            </span>
+            <span class="badge online">ok</span>
+          </li>
+          
+        </ul>
+      </div>
+      <div class="panel">
+        <h3>Definiciones</h3>
+        <ul class="mini-list small">
+          <li><span class="muted">uptime</span><span>chequeos ok / total</span></li>
+          <li><span class="muted">timeout</span><span>sin respuesta a 30 s</span></li>
+          <li><span class="muted">espejo</span><span>mismo hash de contenido</span></li>
+        </ul>
+      </div>
+      <div class="panel">
+        <h3>Monitoreo</h3>
+        <p class="small muted" style="margin:0 0 10px">
+          Podés consultar el estado desde tu propio script con la API pública.
+        </p>
+        <a class="btn btn-ghost btn-sm" href="/api">Ver API</a>
+      </div>
+    </aside>
+  </div>
+</div>
+
+  </main>
+
+  <footer class="site-footer">
+    <div class="wrap">
+      <div>
+        <div class="brand" style="margin-bottom:10px">
+          <svg class="brand-mark" viewBox="0 0 48 48" fill="none" aria-hidden="true">
+            <path d="M18 44h12l-2.2-20h-7.6L18 44Z" fill="#f0a020" opacity=".9"/>
+            <rect x="19.5" y="9.5" width="9" height="11" rx="2" fill="#ffe6b0"/>
+            <path d="M20 12.5 8 9M28 12.5 40 9" stroke="#ffc45c" stroke-width="1.6" stroke-linecap="round" opacity=".55"/>
+          </svg>
+          <span class="brand-name" style="font-size:1.05rem">FARO</span>
+        </div>
+        <p style="margin:0;max-width:330px">
+          Buscador independiente de servicios <span class="mono">.onion</span>.
+          Sin anuncios, sin rastreo, sin recursos de terceros.
+        </p>
+        <p class="small" style="margin:12px 0 0">v1.0.0 · modo demo</p>
+      </div>
+      <div class="foot-cols">
+        <div class="foot-col">
+          <h4>Portal</h4>
+          <a href="/search">Búsqueda</a>
+          <a href="/directorio">Directorio</a>
+          <a href="/estado">Estado de la red</a>
+          <a href="/azar">Nodo al azar</a>
+        </div>
+        <div class="foot-col">
+          <h4>Desarrolladores</h4>
+          <a href="/api">API pública</a>
+          <a href="/api/stats">/api/stats</a>
+          <a href="/health">/health</a>
+        </div>
+        <div class="foot-col">
+          <h4>Operación</h4>
+          <a href="/admin">Centro de mando</a>
+          <a href="/admin/reports">Reportes</a>
+          <a href="/admin/blocklist">Blocklist</a>
+        </div>
+      </div>
+    </div>
+  </footer>
+<script src="/static/demo.js" defer></script></body>
+</html>
